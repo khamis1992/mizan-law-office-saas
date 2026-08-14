@@ -6,6 +6,8 @@ const userManagementMigration = readFileSync(new URL('../supabase/migrations/202
 const autoSubscriptionMigration = readFileSync(new URL('../supabase/migrations/20260814_008_auto_trial_subscription.sql', import.meta.url), 'utf8');
 const maintenanceMigration = readFileSync(new URL('../supabase/migrations/20260814_009_platform_maintenance_guard.sql', import.meta.url), 'utf8');
 const home = readFileSync(new URL('../client/src/pages/Home.tsx', import.meta.url), 'utf8');
+const app = readFileSync(new URL('../client/src/App.tsx', import.meta.url), 'utf8');
+const platformPages = readFileSync(new URL('../client/src/components/PlatformPages.tsx', import.meta.url), 'utf8');
 
 describe('SaaS platform administration contract', () => {
   it('defines a central Super Admin, subscription catalog, and office subscriptions', () => {
@@ -26,7 +28,9 @@ describe('SaaS platform administration contract', () => {
 
   it('routes verified platform admins to the central dashboard instead of tenant setup', () => {
     expect(home).toContain("supabase.from('platform_admins')");
-    expect(home).toContain('if (isPlatformAdmin) return <PlatformAdmin');
+    expect(home).toContain('return <PlatformPages');
+    expect(app).toContain('path="/platform/:section"');
+    expect(platformPages).toContain("href={`/platform/${item.id}`}");
   });
 
   it('enables safe platform user management and a default trial for every new office', () => {

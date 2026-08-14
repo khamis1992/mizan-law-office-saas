@@ -133,6 +133,13 @@
   main[dir="rtl"]:has(> aside.fixed) table tbody tr:hover {
     background: color-mix(in oklch, #e8c377, white 94%);
   }
+  html[data-platform-page="overview"] main[dir="rtl"]:has(> aside.fixed) section:not(#overview),
+  html[data-platform-page="offices"] main[dir="rtl"]:has(> aside.fixed) section:not(#offices),
+  html[data-platform-page="invoices"] main[dir="rtl"]:has(> aside.fixed) section:not(#invoices),
+  html[data-platform-page="recurring"] main[dir="rtl"]:has(> aside.fixed) section:not(#recurring),
+  html[data-platform-page="users"] main[dir="rtl"]:has(> aside.fixed) section:not(#users) { display: none; }
+  html[data-platform-page] main[dir="rtl"]:has(> aside.fixed) section { animation: platform-page-in 220ms cubic-bezier(.23,1,.32,1); }
+  @keyframes platform-page-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   @media (min-width: 1024px) {
     main[dir="rtl"]:has(> aside.fixed) { padding-right: 17.5rem !important; }
   }

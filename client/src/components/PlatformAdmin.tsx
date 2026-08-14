@@ -28,8 +28,18 @@ export default function PlatformAdmin({ adminId }: { adminId: string }) {
   const [offices, setOffices] = useState<Office[]>([]); const [plans, setPlans] = useState<Plan[]>([]); const [subs, setSubs] = useState<Subscription[]>([]); const [profiles, setProfiles] = useState<Profile[]>([]); const [loading, setLoading] = useState(true); const [active, setActive] = useState('overview'); const [busy, setBusy] = useState<string | null>(null);
   const load = async () => { setLoading(true); const [a,b,c,d] = await Promise.all([supabase.from('offices').select('id,name,email,phone,address,service_status,created_at').order('created_at',{ascending:false}),supabase.from('saas_plans').select('id,code,name_ar,monthly_price_qar,max_users,is_active').order('sort_order'),supabase.from('office_subscriptions').select('id,office_id,plan_id,status,billing_cycle,current_period_ends_at,created_at,saas_plans(id,code,name_ar,monthly_price_qar,max_users,is_active)'),supabase.from('profiles').select('id,office_id,is_active,display_name,email,role,created_at').order('created_at',{ascending:false})]); if (a.error||b.error||c.error||d.error) toast.error('تعذر تحميل بيانات المنصة.'); setOffices((a.data??[]) as Office[]); setPlans((b.data??[]) as Plan[]); setSubs((c.data??[]) as Subscription[]); setProfiles((d.data??[]) as Profile[]); setLoading(false); };
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const syncRoute = () => {
+      const segment = window.location.pathname.split('/').filter(Boolean).at(-1);
+      setActive(nav.some(item => item.id === segment) ? segment! : 'overview');
+    };
+    syncRoute();
+    window.addEventListener('popstate', syncRoute);
+    return () => { window.removeEventListener('popstate', syncRoute); delete document.documentElement.dataset.platformPage; };
+  }, []);
+  useEffect(() => { document.documentElement.dataset.platformPage = active; }, [active]);
   const stat = useMemo(() => ({ offices: offices.length, active: offices.filter(x=>['active','trial'].includes(x.service_status)).length, users: profiles.filter(x=>x.is_active).length, paid: subs.filter(x=>x.status==='active').length, newOffices: offices.filter(x=>newer(x.created_at)).length }), [offices,profiles,subs]);
-  const move = (id: string) => { setActive(id); document.getElementById(id)?.scrollIntoView({ behavior:'smooth', block:'start' }); };
+  const move = (id: string) => { window.history.pushState({}, '', `/platform/${id}`); setActive(id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const log = (action:string,office_id:string|null,metadata:Record<string,unknown>) => supabase.from('platform_audit_logs').insert({ actor_id:adminId,action,office_id,metadata });
   const service = async (office:Office,next:'active'|'suspended') => { setBusy(office.id); const {error}=await supabase.from('offices').update({service_status:next,service_status_changed_at:new Date().toISOString()}).eq('id',office.id); if(error) toast.error(error.message); else { await log(next==='active'?'office_activated':'office_suspended',office.id,{}); toast.success(next==='active'?'تم تفعيل المكتب.':'تم تعليق المكتب.'); await load(); } setBusy(null); };
   const changePlan = async (officeId:string,planId:string) => { const plan=plans.find(x=>x.id===planId); const {error}=await supabase.from('office_subscriptions').update({plan_id:planId,status:plan?.code==='trial'?'trialing':'active',updated_by:adminId}).eq('office_id',officeId); if(error) toast.error(error.message); else { await log('subscription_plan_changed',officeId,{planId}); toast.success('تم تحديث الخطة.'); load(); } };
