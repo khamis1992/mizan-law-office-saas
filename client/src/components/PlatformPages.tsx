@@ -33,7 +33,7 @@ export default function PlatformPages({adminId,section}:{adminId:string;section:
     supabase.from('profiles').select('id,office_id,display_name,email,role,is_active,created_at').order('created_at',{ascending:false}),
     supabase.from('platform_audit_logs').select('id,action,office_id,actor_id,metadata,created_at').order('created_at',{ascending:false}).limit(100),
     supabase.from('platform_notifications').select('id,category,severity,title_ar,body_ar,office_id,read_at,created_at').order('created_at',{ascending:false}).limit(100),
-    supabase.from('saas_invoices').select('id,office_id,grand_total,status,created_at').order('created_at',{ascending:false}).limit(250),
+    supabase.from('saas_invoices').select('id,office_id,total_amount,status,created_at').order('created_at',{ascending:false}).limit(250),
     supabase.from('platform_subscription_events').select('id,office_id,event_type,created_at').order('created_at',{ascending:false}).limit(250),
     supabase.from('support_tickets').select('id,office_id,subject,category,priority,status,opened_by,created_at,last_activity_at').order('last_activity_at',{ascending:false}),
     supabase.from('platform_brand_settings').select('app_name,legal_name,logo_url,support_email,support_phone,invoice_footer,primary_contact_name,message_templates').maybeSingle(),
