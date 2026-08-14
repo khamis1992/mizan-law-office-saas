@@ -65,4 +65,104 @@
 @layer components {
   .input-base { width: 100%; height: 2.5rem; border-radius: calc(var(--radius) - 2px); border: 1px solid var(--input); background: var(--background); padding: 0 .75rem; font-size: .875rem; }
   .input-base:focus { outline: 2px solid color-mix(in oklch, var(--ring), transparent 70%); outline-offset: 1px; }
+
+  /* منصة Super Admin: تحسين التدرج البصري باستخدام ألوان الهوية ذاتها. */
+  main[dir="rtl"]:has(> aside.fixed) {
+    background:
+      radial-gradient(circle at 0% 0%, color-mix(in oklch, var(--primary), transparent 94%) 0, transparent 27rem),
+      var(--background);
+  }
+  main[dir="rtl"]:has(> aside.fixed) > aside.fixed {
+    width: 17.5rem;
+    box-shadow: -14px 0 34px color-mix(in oklch, #103b35, transparent 82%);
+  }
+  main[dir="rtl"]:has(> aside.fixed) > aside.fixed > div:first-child {
+    background: linear-gradient(145deg, #103b35 0%, #155249 100%);
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+  }
+  main[dir="rtl"]:has(> aside.fixed) > aside.fixed nav button {
+    position: relative;
+    min-height: 2.9rem;
+    letter-spacing: .01em;
+  }
+  main[dir="rtl"]:has(> aside.fixed) > aside.fixed nav button[aria-current="page"]::before,
+  main[dir="rtl"]:has(> aside.fixed) > aside.fixed nav button.bg-\[\#e8c377\]::before {
+    content: '';
+    position: absolute;
+    inset-inline-end: -1rem;
+    top: .6rem;
+    bottom: .6rem;
+    width: .22rem;
+    border-radius: 999px 0 0 999px;
+    background: #e8c377;
+  }
+  main[dir="rtl"]:has(> aside.fixed) > header {
+    background: linear-gradient(115deg, #103b35 0%, #12473f 100%);
+  }
+  main[dir="rtl"]:has(> aside.fixed) > header + div {
+    max-width: 92rem;
+    padding-top: 2.5rem;
+    padding-bottom: 3.5rem;
+  }
+  main[dir="rtl"]:has(> aside.fixed) section > .grid > .shadow-sm,
+  main[dir="rtl"]:has(> aside.fixed) section .shadow-sm {
+    border: 1px solid color-mix(in oklch, var(--border), transparent 28%);
+    box-shadow: 0 12px 30px color-mix(in oklch, #103b35, transparent 92%);
+  }
+  main[dir="rtl"]:has(> aside.fixed) section[id="overview"] .grid > .shadow-sm {
+    overflow: hidden;
+    position: relative;
+  }
+  main[dir="rtl"]:has(> aside.fixed) section[id="overview"] .grid > .shadow-sm::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #e8c377 0%, #1b6258 76%);
+  }
+  main[dir="rtl"]:has(> aside.fixed) table thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  main[dir="rtl"]:has(> aside.fixed) table tbody tr {
+    transition: background-color 160ms ease, transform 160ms ease;
+  }
+  main[dir="rtl"]:has(> aside.fixed) table tbody tr:hover {
+    background: color-mix(in oklch, #e8c377, white 94%);
+  }
+  @media (min-width: 1024px) {
+    main[dir="rtl"]:has(> aside.fixed) { padding-right: 17.5rem !important; }
+  }
+  @media (max-width: 1023px) {
+    main[dir="rtl"]:has(> aside.fixed) > nav.lg\:hidden {
+      box-shadow: 0 6px 18px color-mix(in oklch, #103b35, transparent 76%);
+    }
+    main[dir="rtl"]:has(> aside.fixed) > header + div { padding: 1.25rem 1rem 2.5rem; }
+    main[dir="rtl"]:has(> aside.fixed) section[id="overview"] .grid > .shadow-sm { min-height: 9rem; }
+    main[dir="rtl"]:has(> aside.fixed) section[id="offices"] { display: block; }
+    main[dir="rtl"]:has(> aside.fixed) section[id="offices"] > .shadow-sm + .shadow-sm { margin-top: 1rem; }
+    main[dir="rtl"]:has(> aside.fixed) .overflow-x-auto { overflow: visible; }
+    main[dir="rtl"]:has(> aside.fixed) table { min-width: 0 !important; display: block; }
+    main[dir="rtl"]:has(> aside.fixed) table thead { display: none; }
+    main[dir="rtl"]:has(> aside.fixed) table tbody { display: grid; gap: .75rem; padding: 1rem; }
+    main[dir="rtl"]:has(> aside.fixed) table tbody tr { display: grid; grid-template-columns: 1fr; gap: .15rem; border: 1px solid color-mix(in oklch, var(--border), transparent 10%); border-radius: 1rem; padding: .75rem; background: white; box-shadow: 0 4px 14px color-mix(in oklch, #103b35, transparent 94%); }
+    main[dir="rtl"]:has(> aside.fixed) table tbody td { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 2rem; padding: .35rem .2rem; text-align: left; border: 0; }
+    main[dir="rtl"]:has(> aside.fixed) table tbody td::before { font-size: .72rem; color: var(--muted-foreground); font-weight: 700; text-align: right; }
+    main[dir="rtl"]:has(> aside.fixed) section[id="offices"] table tbody td:nth-child(1)::before { content: 'المكتب'; }
+    main[dir="rtl"]:has(> aside.fixed) section[id="offices"] table tbody td:nth-child(2)::before { content: 'الخدمة'; }
+    main[dir="rtl"]:has(> aside.fixed) section[id="offices"] table tbody td:nth-child(3)::before { content: 'الخطة'; }
+    main[dir="rtl"]:has(> aside.fixed) section[id="offices"] table tbody td:nth-child(4)::before { content: 'المستخدمون'; }
+    main[dir="rtl"]:has(> aside.fixed) section[id="offices"] table tbody td:nth-child(5)::before { content: 'انتهاء الفترة'; }
+    main[dir="rtl"]:has(> aside.fixed) section[id="offices"] table tbody td:nth-child(6)::before { content: 'إدارة'; }
+    main[dir="rtl"]:has(> aside.fixed) section[id="users"] table tbody td:nth-child(1)::before { content: 'المستخدم'; }
+    main[dir="rtl"]:has(> aside.fixed) section[id="users"] table tbody td:nth-child(2)::before { content: 'الدور'; }
+    main[dir="rtl"]:has(> aside.fixed) section[id="users"] table tbody td:nth-child(3)::before { content: 'المكتب'; }
+    main[dir="rtl"]:has(> aside.fixed) section[id="users"] table tbody td:nth-child(4)::before { content: 'الحالة'; }
+    main[dir="rtl"]:has(> aside.fixed) section[id="users"] table tbody td:nth-child(5)::before { content: 'الانضمام'; }
+    main[dir="rtl"]:has(> aside.fixed) section[id="users"] table tbody td:nth-child(6)::before { content: 'إجراء'; }
+    main[dir="rtl"]:has(> aside.fixed) table tbody td select { max-width: 10rem; }
+  }
 }
