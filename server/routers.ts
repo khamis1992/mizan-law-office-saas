@@ -1,4 +1,5 @@
 import { COOKIE_NAME } from "@shared/const";
+import { legalAssistantInput, runLegalAssistant } from "./legalAssistant";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
@@ -15,6 +16,11 @@ export const appRouter = router({
         success: true,
       } as const;
     }),
+  }),
+  legalAssistant: router({
+    generate: publicProcedure
+      .input(legalAssistantInput)
+      .mutation(({ input }) => runLegalAssistant(input)),
   }),
 
   // TODO: add feature routers here, e.g.
