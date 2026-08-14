@@ -29,4 +29,11 @@ describe('Supabase RLS contract', () => {
     expect(hardeningMigration).toContain('create policy documents_insert_professional');
     expect(hardeningMigration).toContain('(select public.is_lawyer_or_manager())');
   });
+
+  it('documents and restricts the security-definer helpers to signed-in users', () => {
+    expect(migration).toContain('revoke all on all functions in schema public from public, anon, authenticated;');
+    expect(migration).toContain('grant execute on function public.current_office_id() to authenticated, service_role;');
+    expect(migration).toContain('grant execute on function public.is_manager() to authenticated, service_role;');
+    expect(migration).toContain('alter default privileges in schema public revoke execute on functions from public, anon, authenticated;');
+  });
 });
