@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const migration = readFileSync(new URL('../supabase/migrations/20260814_016_recurring_billing.sql', import.meta.url), 'utf8');
 const manualMigration = readFileSync(new URL('../supabase/migrations/20260814_017_manual_recurring_billing.sql', import.meta.url), 'utf8');
+const alertSyncMigration = readFileSync(new URL('../supabase/migrations/20260814_023_fix_service_role_alert_sync.sql', import.meta.url), 'utf8');
 
 describe('recurring billing contracts', () => {
   it('creates a draft invoice once per subscription billing period and advances the next run date', () => {
@@ -16,5 +17,11 @@ describe('recurring billing contracts', () => {
     expect(manualMigration).toContain('if not public.is_platform_admin() then');
     expect(manualMigration).toContain("raise exception 'تتطلب هذه العملية صلاحية Super Admin'");
     expect(manualMigration).toContain('grant execute on function public.run_recurring_billing_manual() to authenticated');
+  });
+
+  it('permits the scheduled service to synchronize explicit renewal-failure notifications', () => {
+    expect(alertSyncMigration).toContain("caller_role <> 'service_role'");
+    expect(alertSyncMigration).toContain("'renewal_failed'");
+    expect(alertSyncMigration).toContain('فشل تجديد الاشتراك');
   });
 });

@@ -8,7 +8,13 @@ const pages = [
   ['offices', 'إدارة الخدمة والخطط'],
   ['invoices', 'الفواتير الضريبية'],
   ['recurring', 'الفوترة الدورية'],
-  ['users', 'إدارة المستخدمين'],
+  ['users', 'إدارة المستخدمين الموسعة'],
+  ['audit', 'سجل التدقيق'],
+  ['alerts', 'مركز التنبيهات'],
+  ['plans', 'إدارة الخطط'],
+  ['analytics', 'تحليلات SaaS'],
+  ['support', 'مركز الدعم'],
+  ['brand', 'العلامة التجارية'],
 ];
 const report = { login: false, desktop: [], mobile: [] };
 const browser = await puppeteer.launch({ executablePath: '/usr/bin/chromium', headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });

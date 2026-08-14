@@ -87,7 +87,7 @@ export default function Home() {
   if (!session) return <Login done={() => load()} />;
   if (isPlatformAdmin) {
     const segment = window.location.pathname.split('/').filter(Boolean).at(-1);
-    const section = ['overview', 'offices', 'invoices', 'recurring', 'users'].includes(segment || '') ? segment as 'overview' | 'offices' | 'invoices' | 'recurring' | 'users' : 'overview';
+    const section = ['overview', 'offices', 'invoices', 'recurring', 'users', 'audit', 'alerts', 'plans', 'analytics', 'support', 'brand'].includes(segment || '') ? segment as 'overview' | 'offices' | 'invoices' | 'recurring' | 'users' | 'audit' | 'alerts' | 'plans' | 'analytics' | 'support' | 'brand' : 'overview';
     return <PlatformPages adminId={session.user.id} section={section} />;
   }
   if (!profile) return <main className="min-h-screen grid place-items-center"><Loader2 className="animate-spin" /></main>;
