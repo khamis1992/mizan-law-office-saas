@@ -1,0 +1,20 @@
+import puppeteer from 'puppeteer-core';
+import { writeFileSync } from 'node:fs';
+
+const baseUrl = 'https://3000-i80waoun7v5kpawef4vlw-868ce110.sg1.manus.computer';
+const credentials = { email: 'superadmin@mizan-office.qa', password: 'Mizan!e834e28e8704bc2e33b58e9939fb76919Q' };
+const report = { login:false, saved:false, reloaded:false, restored:false };
+const browser = await puppeteer.launch({ executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox','--disable-dev-shm-usage'] });
+let page; let originalName=''; let originalEmail=''; let originalPhone=''; let originalTemplates='{}'; let stage='launch';
+const replace = async (selector,value) => { await page.focus(selector);await page.keyboard.down('Control');await page.keyboard.press('A');await page.keyboard.up('Control');await page.keyboard.press('Backspace');await page.type(selector,value); };
+try {
+  page = await browser.newPage();await page.setViewport({width:1440,height:1000,deviceScaleFactor:1});stage='open_login';
+  await page.goto(baseUrl,{waitUntil:'networkidle2',timeout:30000});await page.waitForSelector('input[type="email"]');stage='submit_login';await page.type('input[type="email"]',credentials.email);await page.type('input[type="password"]',credentials.password);await page.click('form button[type="submit"], form button');stage='wait_platform';await page.waitForFunction(()=>location.pathname.includes('/platform/')||document.body.innerText.includes('حالة المنصة في لمحة'),{timeout:30000});report.login=true;
+  await page.goto(`${baseUrl}/platform/brand`,{waitUntil:'networkidle2',timeout:30000});await page.waitForSelector('input[placeholder="اسم المنصة"]');
+  originalName=await page.$eval('input[placeholder="اسم المنصة"]',el=>el.value);originalEmail=await page.$eval('input[placeholder="بريد الدعم"]',el=>el.value);originalPhone=await page.$eval('input[placeholder="هاتف الدعم"]',el=>el.value);originalTemplates=await page.$eval('textarea[placeholder*="قوالب"]',el=>el.value);
+  await replace('input[placeholder="اسم المنصة"]',`${originalName} QA`);await replace('input[placeholder="بريد الدعم"]','qa-brand@mizan-office.qa');await replace('input[placeholder="هاتف الدعم"]','55501001');await replace('textarea[placeholder*="قوالب"]','{"renewal":"رسالة تجديد QA"}');
+  await page.evaluate(()=>[...document.querySelectorAll('button')].find(x=>x.textContent?.includes('حفظ الإعدادات'))?.dispatchEvent(new MouseEvent('click',{bubbles:true})));await new Promise(resolve=>setTimeout(resolve,800));report.saved=true;
+  await page.reload({waitUntil:'networkidle2'});await page.waitForSelector('textarea[placeholder*="قوالب"]');const persisted=await page.evaluate(()=>({name:document.querySelector('input[placeholder="اسم المنصة"]')?.value,email:document.querySelector('input[placeholder="بريد الدعم"]')?.value,phone:document.querySelector('input[placeholder="هاتف الدعم"]')?.value,templates:document.querySelector('textarea[placeholder*="قوالب"]')?.value}));if(persisted.name!==`${originalName} QA`||persisted.email!=='qa-brand@mizan-office.qa'||persisted.phone!=='55501001'||!persisted.templates.includes('renewal'))throw new Error(`Brand settings were not persisted: ${JSON.stringify(persisted)}`);report.reloaded=true;
+  await replace('input[placeholder="اسم المنصة"]',originalName);await replace('input[placeholder="بريد الدعم"]',originalEmail);await replace('input[placeholder="هاتف الدعم"]',originalPhone);await replace('textarea[placeholder*="قوالب"]',originalTemplates);await page.evaluate(()=>[...document.querySelectorAll('button')].find(x=>x.textContent?.includes('حفظ الإعدادات'))?.dispatchEvent(new MouseEvent('click',{bubbles:true})));await new Promise(resolve=>setTimeout(resolve,800));report.restored=true;report.passed=true;
+}catch(error){report.passed=false;report.stage=stage;report.url=page?.url();report.body=(await page?.evaluate(()=>document.body.innerText.slice(0,500)))||'';report.error=error instanceof Error?error.message:String(error);process.exitCode=1;}
+finally{await browser.close();writeFileSync('/home/ubuntu/e2e-platform-brand-result.json',JSON.stringify(report,null,2));}
