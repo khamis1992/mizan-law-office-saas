@@ -10,6 +10,27 @@ import { createContext } from "./context";
 import { recurringBillingHandler } from "../recurringBilling";
 import { serveStatic, setupVite } from "./vite";
 
+/** مهمة دورية: إشعارات الجلسات القريبة وتنبيهات التقادم — تُستدعى من Heartbeat. */
+export async function dispatchOfficeRemindersHandler(req: express.Request, res: express.Response) {
+  try {
+    const baseUrl = process.env.VITE_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!baseUrl || !serviceKey) return res.status(500).json({ error: 'service credentials not configured' });
+    const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'content-type': 'application/json' };
+    const [hearings, limitations] = await Promise.all([
+      fetch(`${baseUrl}/rest/v1/rpc/dispatch_hearing_reminders`, { method: 'POST', headers, body: JSON.stringify({}) }),
+      fetch(`${baseUrl}/rest/v1/rpc/dispatch_limitation_alerts`, { method: 'POST', headers, body: JSON.stringify({}) }),
+    ]);
+    const hearingCount = await hearings.json().catch(() => 0);
+    const limitationCount = await limitations.json().catch(() => 0);
+    if (!hearings.ok) throw new Error(`hearing reminders RPC failed: ${JSON.stringify(hearingCount)}`);
+    if (!limitations.ok) throw new Error(`limitation alerts RPC failed: ${JSON.stringify(limitationCount)}`);
+    return res.json({ ok: true, hearing_reminders: Number(hearingCount ?? 0), limitation_alerts: Number(limitationCount ?? 0) });
+  } catch (error) {
+    return res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+}
+
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
     const server = net.createServer();
@@ -38,6 +59,7 @@ async function startServer() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   app.post('/api/scheduled/recurring-billing', recurringBillingHandler);
+  app.post('/api/scheduled/office-reminders', dispatchOfficeRemindersHandler);
   // tRPC API
   app.use(
     "/api/trpc",
