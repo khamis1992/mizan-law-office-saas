@@ -6,8 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle2, Download, FileText, Loader2, Pencil, Plus, ReceiptText, Settings2, WalletCards } from 'lucide-react';
+import { CheckCircle2, Download, FileText, Loader2, Pencil, Plus, ReceiptText, Search, Settings2, WalletCards } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -29,7 +30,9 @@ export default function InvoiceManager({ adminId, offices }: { adminId: string; 
   const [showNew, setShowNew] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
-  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const [invQuery, setInvQuery] = useState('');
+  const [invStatus, setInvStatus] = useState('all');
+  const [invOffice, setInvOffice] = useState('all');
 
   const load = async () => {
     setLoading(true);
@@ -50,6 +53,13 @@ export default function InvoiceManager({ adminId, offices }: { adminId: string; 
     paid: invoices.reduce((sum, item) => sum + Number(item.paid_amount), 0),
     due: invoices.filter(item => !['paid', 'void'].includes(item.status)).reduce((sum, item) => sum + Number(item.balance_amount), 0),
   }), [invoices]);
+
+  const filteredInvoices = useMemo(() => invoices.filter(inv => {
+    const matchesQuery = !invQuery || inv.invoice_number.includes(invQuery) || inv.customer_name.includes(invQuery);
+    const matchesStatus = invStatus === 'all' || inv.status === invStatus;
+    const matchesOffice = invOffice === 'all' || inv.office_id === invOffice;
+    return matchesQuery && matchesStatus && matchesOffice;
+  }), [invoices, invQuery, invStatus, invOffice]);
 
   const writeAudit = async (action: string, invoice: { id: string; office_id: string; invoice_number: string }, metadata: Record<string, unknown>) => {
     await supabase.from('platform_audit_logs').insert({ actor_id: adminId, action, office_id: invoice.office_id, metadata: { invoice_id: invoice.id, invoice_number: invoice.invoice_number, ...metadata } });
@@ -73,23 +83,6 @@ export default function InvoiceManager({ adminId, offices }: { adminId: string; 
     setShowNew(false);
     await load();
     setBusy(false);
-  };
-
-  const approveInvoice = async (invoice: Invoice) => {
-    setBusy(true);
-    const { error } = await supabase.from('saas_invoices').update({ status: 'issued', issued_at: new Date().toISOString() }).eq('id', invoice.id).eq('status', 'draft');
-    if (error) toast.error(error.message);
-    else { await writeAudit('invoice_issued', invoice, {}); toast.success('تم اعتماد الفاتورة وإصدارها.'); await load(); }
-    setBusy(false);
-  };
-
-  const updateDraft = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!editingInvoice) return;
-    const form = new FormData(event.currentTarget);
-    const { error } = await supabase.from('saas_invoices').update({ due_at: form.get('due_at') ? new Date(String(form.get('due_at'))).toISOString() : null, notes: form.get('notes') || null }).eq('id', editingInvoice.id).eq('status', 'draft');
-    if (error) toast.error(error.message);
-    else { await writeAudit('invoice_draft_updated', editingInvoice, {}); toast.success('تم تحديث مسودة الفاتورة.'); setEditingInvoice(null); await load(); }
   };
 
   const submitPayment = async (event: FormEvent<HTMLFormElement>) => {
@@ -139,8 +132,10 @@ export default function InvoiceManager({ adminId, offices }: { adminId: string; 
     </CardHeader>
     <CardContent>
       <div className="grid sm:grid-cols-3 gap-3 mb-5">{[{ label: 'الفواتير الصادرة', value: totals.issued, tone: 'text-blue-700' }, { label: 'المحصل', value: totals.paid, tone: 'text-emerald-700' }, { label: 'المتبقي', value: totals.due, tone: 'text-amber-700' }].map(item => <div key={item.label} className="rounded-xl bg-[#f4f7f5] p-4"><p className="text-xs text-muted-foreground">{item.label}</p><p className={`font-bold mt-2 ${item.tone}`}>{formatMoney(item.value, settings?.currency)}</p></div>)}</div>
-      <div className="overflow-x-auto"><table className="w-full min-w-[920px] text-sm"><thead className="bg-[#edf4f1] text-muted-foreground"><tr>{['الرقم', 'المكتب', 'الإصدار', 'الإجمالي', 'المدفوع / المتبقي', 'الحالة', 'الإجراءات'].map(item => <th key={item} className="p-4 text-right font-medium">{item}</th>)}</tr></thead><tbody className="divide-y">{invoices.map(invoice => <tr key={invoice.id} className="hover:bg-[#f8fbfa]"><td className="p-4 font-mono text-xs text-[#1b6258]">{invoice.invoice_number}</td><td className="p-4 font-semibold text-[#153a36]">{invoice.customer_name}</td><td className="p-4 text-muted-foreground">{formatDate(invoice.issued_at || invoice.created_at)}</td><td className="p-4 font-semibold">{formatMoney(invoice.total_amount, invoice.currency)}</td><td className="p-4"><p>{formatMoney(invoice.paid_amount, invoice.currency)}</p><p className="text-xs text-muted-foreground mt-1">متبقي: {formatMoney(invoice.balance_amount, invoice.currency)}</p></td><td className="p-4"><Badge variant="outline" className={tones[invoice.status]}>{labels[invoice.status] || invoice.status}</Badge></td><td className="p-4"><div className="flex gap-1 flex-wrap"><Button size="sm" variant="outline" onClick={() => exportPdf(invoice)}><Download className="h-4 w-4" />PDF</Button>{['issued', 'partially_paid', 'overdue'].includes(invoice.status) && <Button size="sm" variant="outline" className="text-[#1b6258]" onClick={() => setPaymentInvoice(invoice)}><WalletCards className="h-4 w-4" />تحصيل</Button>}{['draft', 'issued'].includes(invoice.status) && Number(invoice.paid_amount) === 0 && <Button size="sm" variant="ghost" className="text-rose-700" onClick={() => voidInvoice(invoice)}>إلغاء</Button>}</div></td></tr>)}</tbody></table></div>
-      {invoices.length === 0 && <div className="py-10 text-center text-sm text-muted-foreground"><FileText className="h-7 w-7 mx-auto mb-3 text-[#1b6258]" />لا توجد فواتير صادرة حتى الآن.</div>}
+      <div className="grid gap-3 mb-4 md:grid-cols-3"><div className="relative"><Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/><Input value={invQuery} onChange={e=>setInvQuery(e.target.value)} placeholder="ابحث برقم الفاتورة أو اسم المكتب…" className="pr-9"/></div><Select value={invStatus} onValueChange={setInvStatus}><SelectTrigger><SelectValue placeholder="الحالة"/></SelectTrigger><SelectContent><SelectItem value="all">كل الحالات</SelectItem>{Object.entries(labels).map(([v,l])=><SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent></Select><Select value={invOffice} onValueChange={setInvOffice}><SelectTrigger><SelectValue placeholder="المكتب"/></SelectTrigger><SelectContent><SelectItem value="all">كل المكاتب</SelectItem>{offices.map(o=><SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent></Select></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[920px] text-sm"><thead className="bg-[#edf4f1] text-muted-foreground"><tr>{['الرقم', 'المكتب', 'الإصدار', 'الإجمالي', 'المدفوع / المتبقي', 'الحالة', 'الإجراءات'].map(item => <th key={item} className="p-4 text-right font-medium">{item}</th>)}</tr></thead><tbody className="divide-y">{filteredInvoices.map(invoice => <tr key={invoice.id} className="hover:bg-[#f8fbfa]"><td className="p-4 font-mono text-xs text-[#1b6258]">{invoice.invoice_number}</td><td className="p-4 font-semibold text-[#153a36]">{invoice.customer_name}</td><td className="p-4 text-muted-foreground">{formatDate(invoice.issued_at || invoice.created_at)}</td><td className="p-4 font-semibold">{formatMoney(invoice.total_amount, invoice.currency)}</td><td className="p-4"><p>{formatMoney(invoice.paid_amount, invoice.currency)}</p><p className="text-xs text-muted-foreground mt-1">متبقي: {formatMoney(invoice.balance_amount, invoice.currency)}</p></td><td className="p-4"><Badge variant="outline" className={tones[invoice.status]}>{labels[invoice.status] || invoice.status}</Badge></td><td className="p-4"><div className="flex gap-1 flex-wrap"><Button size="sm" variant="outline" onClick={() => exportPdf(invoice)}><Download className="h-4 w-4" />PDF</Button>{['issued', 'partially_paid', 'overdue'].includes(invoice.status) && <Button size="sm" variant="outline" className="text-[#1b6258]" onClick={() => setPaymentInvoice(invoice)}><WalletCards className="h-4 w-4" />تحصيل</Button>}{['draft', 'issued'].includes(invoice.status) && Number(invoice.paid_amount) === 0 && <Button size="sm" variant="ghost" className="text-rose-700" onClick={() => voidInvoice(invoice)}>إلغاء</Button>}</div></td></tr>)}</tbody></table></div>
+      {filteredInvoices.length === 0 && <div className="py-10 text-center text-sm text-muted-foreground"><FileText className="h-7 w-7 mx-auto mb-3 text-[#1b6258]" />لا توجد فواتير مطابقة.</div>}
+      <p className="mt-3 text-xs text-muted-foreground">عرض {filteredInvoices.length} من {invoices.length} فاتورة</p>
     </CardContent>
     <Dialog open={showNew} onOpenChange={setShowNew}><DialogContent dir="rtl" className="max-w-xl"><DialogHeader><DialogTitle>إصدار فاتورة ضريبية</DialogTitle><DialogDescription>تُصدر فاتورة اشتراك ببند واحد مع حساب الضريبة وحفظها في السجل.</DialogDescription></DialogHeader><form className="grid grid-cols-2 gap-4" onSubmit={submitInvoice}><div className="col-span-2"><Label>المكتب المشترك</Label><select name="office_id" required className="w-full h-10 rounded-md border bg-background px-3"><option value="">اختر المكتب</option>{offices.map(office => <option key={office.id} value={office.id}>{office.name}</option>)}</select></div><div className="col-span-2"><Label>وصف الخدمة</Label><Input name="description" defaultValue="اشتراك منصة ميزان المكتب" required /></div><div><Label>المبلغ قبل الضريبة</Label><Input name="amount" type="number" min="0" step="0.01" required /></div><div><Label>نسبة الضريبة %</Label><Input name="tax_rate" type="number" min="0" max="100" step="0.01" defaultValue={settings?.default_tax_rate ?? 0} required /></div><div className="col-span-2"><Label>تاريخ الاستحقاق</Label><Input name="due_at" type="date" /></div><div className="col-span-2"><Label>ملاحظات</Label><Textarea name="notes" /></div><Button disabled={busy || offices.length === 0} className="col-span-2 bg-[#0d3b36]">{busy && <Loader2 className="h-4 w-4 animate-spin" />}إصدار الفاتورة</Button>{offices.length === 0 && <p className="col-span-2 text-xs text-amber-700">أنشئ مكتباً مشتركاً أولاً قبل إصدار الفاتورة.</p>}</form></DialogContent></Dialog>
     <Dialog open={showSettings} onOpenChange={setShowSettings}><DialogContent dir="rtl" className="max-w-xl"><DialogHeader><DialogTitle>بيانات مُصدر الفاتورة</DialogTitle><DialogDescription>نسبة الضريبة افتراضية وقابلة للمراجعة قبل إصدار كل فاتورة.</DialogDescription></DialogHeader><form className="grid grid-cols-2 gap-4" onSubmit={submitSettings}><div className="col-span-2"><Label>اسم الجهة</Label><Input name="issuer_name" defaultValue={settings?.issuer_name} required /></div><div><Label>البريد</Label><Input name="issuer_email" dir="ltr" defaultValue={settings?.issuer_email ?? ''} /></div><div><Label>الهاتف</Label><Input name="issuer_phone" dir="ltr" defaultValue={settings?.issuer_phone ?? ''} /></div><div><Label>الرقم الضريبي</Label><Input name="tax_registration_number" dir="ltr" defaultValue={settings?.tax_registration_number ?? ''} /></div><div><Label>بادئة الفاتورة</Label><Input name="invoice_prefix" dir="ltr" defaultValue={settings?.invoice_prefix} required /></div><div><Label>نسبة الضريبة الافتراضية %</Label><Input name="default_tax_rate" type="number" min="0" max="100" step="0.01" defaultValue={settings?.default_tax_rate ?? 0} required /></div><div className="col-span-2"><Label>العنوان</Label><Textarea name="issuer_address" defaultValue={settings?.issuer_address ?? ''} /></div><Button className="col-span-2 bg-[#0d3b36]">حفظ الإعدادات</Button></form></DialogContent></Dialog>

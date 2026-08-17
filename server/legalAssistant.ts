@@ -1,7 +1,9 @@
 import { z } from 'zod';
-
-const AI_ENDPOINT = 'https://api.x.ai/v1/chat/completions';
-const MODEL = 'grok-4.6';
+import { aiModelName, aiProviderName, callChatCompletion } from './aiClient';
+import { assertAiQuota } from './aiQuota';
+import { assertPractitioner, getProfile, getVerifiedUser, readResponse, requiredEnv, supabaseHeaders, type Profile } from './supabaseAccess';
+import { buildExcerpt, searchTerms } from './textExcerpts';
+import { CANDIDATE_LIMIT, buildCandidateFilter, extractSearchTerms, rankSections, type RankableSection } from './retrieval';
 
 export const legalAssistantInput = z.object({
   accessToken: z.string().min(20),
@@ -26,8 +28,6 @@ export type LegalAssistantOutput = z.infer<typeof aiResultSchema> & {
   similarPrecedents: PrecedentExcerpt[];
 };
 
-type SupabaseUser = { id: string; email?: string | null };
-type Profile = { id: string; office_id: string | null; role: 'manager' | 'lawyer' | 'employee'; display_name: string };
 export type SourceExcerpt = {
   id: string;
   sourceId: string;
@@ -51,86 +51,35 @@ export type PrecedentExcerpt = {
   relevanceScore: number;
 };
 
-function requiredEnv(name: 'VITE_SUPABASE_URL' | 'VITE_SUPABASE_PUBLISHABLE_KEY' | 'XAI_API_KEY') {
-  const value = process.env[name];
-  if (!value) throw new Error(`الإعداد ${name} غير متوفر على الخادم.`);
-  return value;
-}
-
-function supabaseHeaders(accessToken: string) {
-  return {
-    apikey: requiredEnv('VITE_SUPABASE_PUBLISHABLE_KEY'),
-    Authorization: `Bearer ${accessToken}`,
-    'Content-Type': 'application/json',
-  };
-}
-
-async function readResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`تعذر تنفيذ الطلب الآمن (${response.status}): ${detail.slice(0, 300)}`);
+async function fetchCandidateSections(accessToken: string, request: string): Promise<SourceExcerpt[]> {
+  const baseUrl = requiredEnv('VITE_SUPABASE_URL');
+  const headers = supabaseHeaders(accessToken);
+  const terms = extractSearchTerms(request);
+  type Row = { id: string; source_id: string; article_number: string | null; heading: string | null; body: string; title: string; source_url: string; official_number: string | null };
+  const mapBack = (ranked: ReturnType<typeof rankSections>): SourceExcerpt[] => ranked.map(section => ({
+    id: section.id, sourceId: section.sourceId, title: section.title, url: section.url,
+    officialNumber: section.officialNumber, articleNumber: section.articleNumber,
+    excerpt: buildExcerpt(section.body, terms),
+  }));
+  // الأساسي: محرك search_vector بترتيب ts_rank
+  if (terms.length) {
+    const rpc = await fetch(`${baseUrl}/rest/v1/rpc/search_legal_sections`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ p_query: terms.join(' '), p_limit: CANDIDATE_LIMIT }),
+    });
+    if (rpc.ok) {
+      const rows = await rpc.json() as Row[];
+      if (rows.length) return mapBack(rankSections(rows.map(row => ({ id: row.id, sourceId: row.source_id, title: row.title, url: row.source_url, officialNumber: row.official_number, articleNumber: row.article_number, heading: row.heading, body: row.body })), terms));
+    }
   }
-  return response.json() as Promise<T>;
-}
-
-async function getVerifiedUser(accessToken: string): Promise<SupabaseUser> {
-  const baseUrl = requiredEnv('VITE_SUPABASE_URL');
-  const response = await fetch(`${baseUrl}/auth/v1/user`, { headers: supabaseHeaders(accessToken) });
-  return readResponse<SupabaseUser>(response);
-}
-
-async function getProfile(accessToken: string, userId: string): Promise<Profile> {
-  const baseUrl = requiredEnv('VITE_SUPABASE_URL');
-  const query = new URLSearchParams({ select: 'id,office_id,role,display_name', id: `eq.${userId}`, limit: '1' });
-  const response = await fetch(`${baseUrl}/rest/v1/profiles?${query.toString()}`, { headers: supabaseHeaders(accessToken) });
-  const profiles = await readResponse<Profile[]>(response);
-  if (!profiles[0]?.office_id) throw new Error('يرجى إنشاء مكتب أو قبول دعوة الانضمام قبل استخدام المساعد القانوني.');
-  return profiles[0];
-}
-
-function searchTerms(request: string) {
-  const ignored = new Set(['في', 'من', 'على', 'إلى', 'عن', 'مع', 'هذا', 'هذه', 'التي', 'الذي', 'هل', 'ما', 'كيف', 'حول', 'بعد', 'قبل', 'لدى']);
-  return request
-    .replace(/[^\u0600-\u06FFa-zA-Z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .map(term => term.trim())
-    .filter(term => term.length >= 3 && !ignored.has(term))
-    .slice(0, 5);
-}
-
-function buildExcerpt(body: string, terms: string[]) {
-  const lowerBody = body.toLocaleLowerCase('ar');
-  const hit = terms.map(term => lowerBody.indexOf(term.toLocaleLowerCase('ar'))).find(index => index >= 0) ?? 0;
-  const from = Math.max(0, hit - 450);
-  const to = Math.min(body.length, hit + 1350);
-  return `${from > 0 ? '…' : ''}${body.slice(from, to).trim()}${to < body.length ? '…' : ''}`;
-}
-
-async function findSourceExcerpts(accessToken: string, request: string): Promise<SourceExcerpt[]> {
-  const baseUrl = requiredEnv('VITE_SUPABASE_URL');
-  const terms = searchTerms(request);
-  const query = new URLSearchParams({
-    select: 'id,source_id,article_number,heading,body,legal_sources(title,source_url,official_number)',
-    limit: '8',
-    order: 'created_at.desc',
-  });
-  const response = await fetch(`${baseUrl}/rest/v1/legal_source_sections?${query.toString()}`, { headers: supabaseHeaders(accessToken) });
-  const rows = await readResponse<Array<{
-    id: string; source_id: string; article_number: string | null; heading: string | null; body: string;
-    legal_sources: { title: string; source_url: string; official_number: string | null } | null;
-  }>>(response);
-
-  return rows
-    .filter(row => row.legal_sources)
-    .map(row => ({
-      id: row.id,
-      sourceId: row.source_id,
-      title: row.legal_sources!.title,
-      url: row.legal_sources!.source_url,
-      officialNumber: row.legal_sources!.official_number,
-      articleNumber: row.article_number,
-      excerpt: buildExcerpt(row.body, terms),
-    }));
+  // الاحتياط: تصفية نصية بأي مصطلح
+  const query = new URLSearchParams({ select: 'id,source_id,article_number,heading,body,legal_sources(title,source_url,official_number)', limit: String(CANDIDATE_LIMIT) });
+  const filter = buildCandidateFilter(terms);
+  if (filter) query.set('or', filter);
+  const response = await fetch(`${baseUrl}/rest/v1/legal_source_sections?${query.toString()}`, { headers });
+  const rows = await readResponse<Array<{ id: string; source_id: string; article_number: string | null; heading: string | null; body: string; legal_sources: { title: string; source_url: string; official_number: string | null } | null }>>(response);
+  const candidates = rows.filter(row => row.legal_sources).map(row => ({ id: row.id, sourceId: row.source_id, title: row.legal_sources!.title, url: row.legal_sources!.source_url, officialNumber: row.legal_sources!.official_number, articleNumber: row.article_number, heading: row.heading, body: row.body }));
+  return mapBack(rankSections(candidates, terms));
 }
 
 async function findSimilarPrecedents(accessToken: string, request: string): Promise<PrecedentExcerpt[]> {
@@ -150,6 +99,8 @@ async function findSimilarPrecedents(accessToken: string, request: string): Prom
     .filter(precedent => terms.length === 0 || precedent.relevanceScore > 0)
     .sort((left, right) => right.relevanceScore - left.relevanceScore);
 }
+
+export { searchTerms };
 
 export function buildLegalSystemPrompt(context: SourceExcerpt[], precedents: PrecedentExcerpt[] = []) {
   const sourceBlock = context.map(source => [
@@ -176,6 +127,7 @@ export function buildLegalSystemPrompt(context: SourceExcerpt[], precedents: Pre
 4) لا تذكر في citedSourceIds أو citedPrecedentIds إلا معرفات المصادر المتاحة أدناه، ولا تضع روابط مخترعة.
 5) أعطِ أسئلة واقعية لسد النقص في الوقائع قبل الجزم بدفع أو مسار دفاعي.
 6) اجعل المسودة مخصصة للمراجعة المهنية قبل الإيداع، وضع التحفظات بوضوح.
+7) عند الاقتباس الحرفي من المصادر ضع الاقتباس بين علامتي «…» دون أي تغيير في ألفاظه.
 
 المصادر المتاحة والموثقة:
 ${sourceBlock || 'لا توجد مصادر متاحة في هذا الطلب؛ يجب طلب استكمال البحث الرسمي.'}
@@ -238,8 +190,8 @@ async function saveAssistantRun(accessToken: string, profile: Profile, input: z.
       office_id: profile.office_id,
       case_id: input.caseId ?? null,
       requested_by: profile.id,
-      provider: 'grok',
-      model: MODEL,
+      provider: aiProviderName(),
+      model: aiModelName(),
       instruction: input.request,
       response_markdown: output.draft,
       cited_sources: output.citations.map(source => ({ id: source.id, title: source.title, url: source.url, articleNumber: source.articleNumber })),
@@ -248,32 +200,25 @@ async function saveAssistantRun(accessToken: string, profile: Profile, input: z.
   });
 }
 
+const USER_TASK_TEMPLATE = `نوع المهمة: {objective}
+
+وقائع أو طلب المحامي:
+{request}`;
+
 export async function runLegalAssistant(input: z.infer<typeof legalAssistantInput>): Promise<LegalAssistantOutput> {
   const user = await getVerifiedUser(input.accessToken);
-  const profile = await getProfile(input.accessToken, user.id);
-  if (!['manager', 'lawyer'].includes(profile.role)) {
-    throw new Error('المساعد القانوني متاح لمدير المكتب والمحامي فقط.');
-  }
+  const profile = assertPractitioner(await getProfile(input.accessToken, user.id), 'المساعد القانوني متاح لمدير المكتب والمحامي فقط.');
+  await assertAiQuota(input.accessToken, profile);
 
-  const [sources, precedents] = await Promise.all([findSourceExcerpts(input.accessToken, input.request), findSimilarPrecedents(input.accessToken, input.request)]);
-  const response = await fetch(AI_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${requiredEnv('XAI_API_KEY')}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      temperature: 0.2,
-      response_format: { type: 'json_schema', json_schema: responseSchema() },
-      messages: [
-        { role: 'system', content: buildLegalSystemPrompt(sources, precedents) },
-        { role: 'user', content: `نوع المهمة: ${input.objective}\n\nوقائع أو طلب المحامي:\n${input.request}` },
-      ],
-    }),
+  const [sources, precedents] = await Promise.all([fetchCandidateSections(input.accessToken, input.request), findSimilarPrecedents(input.accessToken, input.request)]);
+  const content = await callChatCompletion({
+    temperature: 0.2,
+    response_format: { type: 'json_schema', json_schema: responseSchema() },
+    messages: [
+      { role: 'system', content: buildLegalSystemPrompt(sources, precedents) },
+      { role: 'user', content: USER_TASK_TEMPLATE.replace('{objective}', input.objective).replace('{request}', input.request) },
+    ],
   });
-  const completion = await readResponse<{ choices?: Array<{ message?: { content?: string } }> }>(response);
-  const content = completion.choices?.[0]?.message?.content;
   if (!content) throw new Error('لم تُرجع خدمة الذكاء الاصطناعي محتوى صالحاً للمراجعة.');
 
   const output = sanitizeAssistantOutput(JSON.parse(content), sources, precedents);
