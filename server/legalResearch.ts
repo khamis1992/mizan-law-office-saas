@@ -4,7 +4,7 @@ import { verifyCitations, type CitationVerification } from './citationGate';
 import { aiModelName, aiProviderName, callChatCompletion } from './aiClient';
 import { assertPractitioner, getProfile, getVerifiedUser, readResponse, requiredEnv, supabaseHeaders, type Profile } from './supabaseAccess';
 import { buildExcerpt } from './textExcerpts';
-import { assessEvidence, buildCandidateFilter, embedText, expandLegalSearchTerms, extractSearchTerms, hybridSearchSections, isSourceCompatibleWithDisputeType, rankSections, suggestFollowUps, type DisputeType, type EvidenceQuality, type RankableSection, type RankedSection, CANDIDATE_LIMIT } from './retrieval';
+import { assessEvidence, applyPreferenceBoost, buildCandidateFilter, embedText, expandLegalSearchTerms, extractSearchTerms, hybridSearchSections, isSourceCompatibleWithDisputeType, rankSections, suggestFollowUps, type DisputeType, type EvidenceQuality, type RankableSection, type RankedSection, CANDIDATE_LIMIT } from './retrieval';
 
 /**
  * مركز البحث القانوني الموثق — المنتج الأول في خارطة التحول.
@@ -263,8 +263,10 @@ export async function executeResearch(
 ): Promise<ResearchResult> {
   const fetchImpl = deps.fetchImpl ?? fetch;
   const { terms, ranked } = await fetchSections(input.accessToken, input.question, input.disputeType, fetchImpl);
-  const citations: ResearchCitation[] = ranked.map(section => ({ ...section, excerpt: buildExcerpt(section.body, terms) }));
-  const evidenceQuality = assessEvidence(ranked);
+  // محرك التعلّم: إعادة ترتيب النتائج حسب تفضيلات المكتب (اعتماد/رفض سابق)
+  const boosted = await applyPreferenceBoost(input.accessToken, ranked, fetchImpl, 'citation');
+  const citations: ResearchCitation[] = boosted.map(section => ({ ...section, excerpt: buildExcerpt(section.body, terms) }));
+  const evidenceQuality = assessEvidence(boosted);
 
   if (evidenceQuality === 'none') return buildGapResult(input.question, evidenceQuality, terms);
 

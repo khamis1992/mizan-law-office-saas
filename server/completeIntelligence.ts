@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { callChatCompletion } from './aiClient';
 import { assertAiQuota } from './aiQuota';
 import { assertPractitioner, getProfile, getVerifiedUser, readResponse, requiredEnv, supabaseHeaders, type Profile } from './supabaseAccess';
+import { linkCaseToCourt, linkDocumentToCase, linkDraftToSource, linkPartyToAffiliate } from './knowledgeGraph';
 
 /**
  * استكمال طبقة الذكاء العميق:
@@ -671,6 +672,69 @@ export async function generateFinancialPortal(input: z.infer<typeof generateFina
   const view = rows[0];
   if (!view) throw new Error('تعذر إنشاء البوابة.');
   return { token: view.token, link: `${process.env.VITE_APP_URL ?? ''}/#/client-financial/${view.token}`, alreadyExists: false };
+}
+
+// ---------------------------------------------------------------------------
+// 13) تسجيل الأحداث وتغذية الرسم البياني تلقائياً
+// ---------------------------------------------------------------------------
+
+export const recordEventInput = z.object({
+  accessToken: z.string().min(20),
+  eventType: z.enum(['document_uploaded', 'draft_approved', 'hearing_outcome', 'conflict_found', 'case_created']),
+  caseId: z.string().uuid().optional(),
+  documentId: z.string().uuid().optional(),
+  draftId: z.string().uuid().optional(),
+  sourceId: z.string().uuid().optional(),
+  courtName: z.string().max(200).optional(),
+  partyName: z.string().max(300).optional(),
+  affiliateName: z.string().max(300).optional(),
+});
+
+/**
+ * نقطة تسجيل الأحداث: كل حدث يكتب حواف الرسم البياني تلقائياً.
+ * - رفع مستند → document→case
+ * - اعتماد مذكرة → draft→source
+ * - نتيجة جلسة → case→court
+ * - تعارض مصالح → party→affiliate
+ */
+export async function recordEvent(input: z.infer<typeof recordEventInput>, deps: DeepDeps = {}) {
+  const fetchImpl = deps.fetchImpl ?? fetch;
+  const user = await getVerifiedUser(input.accessToken, fetchImpl);
+  const profile = await getProfile(input.accessToken, user.id, fetchImpl);
+  const baseUrl = requiredEnv('VITE_SUPABASE_URL');
+  const headers = supabaseHeaders(input.accessToken);
+  if (!profile.office_id) throw new Error('يرجى إنشاء مكتب قبل تسجيل الأحداث.');
+
+  const edgesWritten: string[] = [];
+
+  if (input.eventType === 'document_uploaded' && input.documentId && input.caseId) {
+    await linkDocumentToCase(input.accessToken, profile.office_id, input.documentId, input.caseId, fetchImpl);
+    edgesWritten.push('document→case');
+  }
+
+  if (input.eventType === 'draft_approved' && input.draftId && input.sourceId) {
+    await linkDraftToSource(input.accessToken, profile.office_id, input.draftId, input.sourceId, fetchImpl);
+    edgesWritten.push('draft→source');
+  }
+
+  if (input.eventType === 'hearing_outcome' && input.caseId && input.courtName) {
+    await linkCaseToCourt(input.accessToken, profile.office_id, input.caseId, input.courtName, fetchImpl);
+    edgesWritten.push('case→court');
+  }
+
+  if (input.eventType === 'conflict_found' && input.partyName && input.affiliateName) {
+    const partyId = `party:${input.partyName}`;
+    const affiliateId = `party:${input.affiliateName}`;
+    await linkPartyToAffiliate(input.accessToken, profile.office_id, partyId, affiliateId, 'affiliate', fetchImpl);
+    edgesWritten.push('party→affiliate');
+  }
+
+  if (input.eventType === 'case_created' && input.caseId && input.courtName) {
+    await linkCaseToCourt(input.accessToken, profile.office_id, input.caseId, input.courtName, fetchImpl);
+    edgesWritten.push('case→court');
+  }
+
+  return { recorded: true, edgesWritten };
 }
 
 export type { Profile };

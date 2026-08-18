@@ -155,6 +155,52 @@ export function suggestFollowUps(question: string, terms: string[]) {
 export { extractSearchTerms };
 
 /**
+ * محرك التعلّم الفعلي (Preference → Retrieval):
+ * يعيد ترتيب النتائج بدمج تفضيلات المكتب (اعتماد/رفض سابق) مع الصلة النصية.
+ * كل اعتماد يرفع وزن المصدر/الدفع، وكل رفض يخفضه — فيتراكم ذكاء المكتب مع الوقت.
+ */
+export async function applyPreferenceBoost<T extends { id: string; title: string; heading?: string | null; body: string; relevanceScore?: number }>(
+  accessToken: string,
+  ranked: T[],
+  fetchImpl: typeof fetch,
+  kind: 'citation' | 'defense' | 'precedent' = 'citation',
+): Promise<T[]> {
+  if (!ranked.length) return ranked;
+  const { requiredEnv, supabaseHeaders } = await import('./supabaseAccess');
+  const baseUrl = requiredEnv('VITE_SUPABASE_URL');
+  const headers = supabaseHeaders(accessToken);
+  try {
+    const response = await fetchImpl(`${baseUrl}/rest/v1/ai_preference_signals?select=value,decision&kind=eq.${kind}&order=created_at.desc&limit=200`, { headers });
+    if (!response.ok) return ranked;
+    const signals = await response.json() as Array<{ value: string; decision: string }>;
+    if (!signals.length) return ranked;
+
+    const accepted = new Map<string, number>();
+    const rejected = new Map<string, number>();
+    for (const signal of signals) {
+      const key = normalizeArabic(signal.value).slice(0, 80);
+      if (signal.decision === 'accepted') accepted.set(key, (accepted.get(key) ?? 0) + 1);
+      else rejected.set(key, (rejected.get(key) ?? 0) + 1);
+    }
+
+    return ranked.map(section => {
+      const haystack = normalizeArabic(`${section.title} ${section.heading ?? ''} ${section.body}`);
+      let boost = 0;
+      for (const [key, count] of accepted) {
+        if (haystack.includes(key)) boost += Math.min(count, 5) * 0.08;
+      }
+      for (const [key, count] of rejected) {
+        if (haystack.includes(key)) boost -= Math.min(count, 5) * 0.1;
+      }
+      const base = section.relevanceScore ?? 0.5;
+      return { ...section, relevanceScore: Math.max(0, Math.min(1, base + boost)) };
+    }).sort((left, right) => (right.relevanceScore ?? 0) - (left.relevanceScore ?? 0));
+  } catch {
+    return ranked;
+  }
+}
+
+/**
  * البحث الهجين (pgvector + ts_rank): يستدعي search_legal_sections_hybrid مع
  * متجه اختياري. عند غياب المتجه (لم يُولَّد بعد) يقع تلقائياً على البحث النصي.
  */

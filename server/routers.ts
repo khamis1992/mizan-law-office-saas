@@ -8,7 +8,7 @@ import { addTimeEntry, addTimeEntryInput, checkConflictInput, checkConflictOfInt
 import { legalResearchInput, runLegalResearch, saveResearchMemo, saveResearchMemoInput } from "./legalResearch";
 import { adaptiveTemplateSuggestions, adaptiveTemplateSuggestionsInput, addDraftComment, addDraftCommentInput, advanceApproval, advanceApprovalInput, listApprovalWorkflows, listApprovalWorkflowsInput, listDraftComments, listDraftCommentsInput, listDraftRevisions, listDraftRevisionsInput, recordTemplateUsage, recordTemplateUsageInput, resolveDraftComment, resolveDraftCommentInput, saveDraftRevision, saveDraftRevisionInput, startApprovalWorkflow, startApprovalWorkflowInput } from "./collaborativeDrafting";
 import { acceptJudgmentPrecedent, acceptJudgmentPrecedentInput, analyzeJudgment, analyzeJudgmentInput, autoIndexEmbeddings, autoIndexEmbeddingsInput, caseChat, caseChatInput, dispatchGraduatedReminders, dispatchGraduatedRemindersInput, exportCaseFile, exportCaseFileInput, generateAdversarialMemo, generateAdversarialMemoInput, lawyerDayBoard, lawyerDayBoardInput, listAdversarialMemos, listAdversarialMemosInput, listAgentSuggestions, listAgentSuggestionsInput, listCaseChat, listCaseChatInput, listCourtHolidays, listCourtHolidaysInput, listLegalAudit, listLegalAuditInput, predictCaseOutcome, predictCaseOutcomeInput, runCaseAgent, runCaseAgentInput, syncCourtCase, syncCourtCaseInput, updateSuggestion, updateSuggestionInput } from "./legalIntelligence";
-import { caseTwin, caseTwinInput, contractOpportunityRadar, contractOpportunityRadarInput, deliberativeMoot, deliberativeMootInput, distillDoctrine, distillDoctrineInput, feeProposal, feeProposalInput, generateFinancialPortal, generateFinancialPortalInput, getProceduralState, getProceduralStateInput, graphConflictCheck, graphConflictCheckInput, listDoctrines, listDoctrinesInput, listPostJudgment, listPostJudgmentInput, matterEconomics, matterEconomicsInput, postJudgment, postJudgmentInput, queryKnowledgeGraph, queryKnowledgeGraphInput, runEvaluation, runEvaluationInput, temporalSources, temporalSourcesInput, transitionProceduralState, transitionProceduralStateInput, writeKnowledgeEdge, writeKnowledgeEdgeInput } from "./completeIntelligence";
+import { caseTwin, caseTwinInput, contractOpportunityRadar, contractOpportunityRadarInput, deliberativeMoot, deliberativeMootInput, distillDoctrine, distillDoctrineInput, feeProposal, feeProposalInput, generateFinancialPortal, generateFinancialPortalInput, getProceduralState, getProceduralStateInput, graphConflictCheck, graphConflictCheckInput, listDoctrines, listDoctrinesInput, listPostJudgment, listPostJudgmentInput, matterEconomics, matterEconomicsInput, postJudgment, postJudgmentInput, queryKnowledgeGraph, queryKnowledgeGraphInput, recordEvent, recordEventInput, runEvaluation, runEvaluationInput, temporalSources, temporalSourcesInput, transitionProceduralState, transitionProceduralStateInput, writeKnowledgeEdge, writeKnowledgeEdgeInput } from "./completeIntelligence";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
@@ -356,6 +356,9 @@ export const appRouter = router({
     financialPortal: publicProcedure
       .input(generateFinancialPortalInput)
       .mutation(({ input }) => generateFinancialPortal(input)),
+    recordEvent: publicProcedure
+      .input(recordEventInput)
+      .mutation(({ input }) => recordEvent(input)),
   }),
 });
 

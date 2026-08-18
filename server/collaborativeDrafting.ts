@@ -297,6 +297,22 @@ export async function advanceApproval(input: z.infer<typeof advanceApprovalInput
       headers: { ...headers, Prefer: 'return=minimal' },
       body: JSON.stringify({ status: 'approved', updated_at: new Date().toISOString() }),
     });
+    // تغذية الرسم البياني: مذكرة معتمدة → مصدرها القانوني (أول استشهاد موثق)
+    try {
+      const draftResponse = await fetchImpl(`${baseUrl}/rest/v1/legal_drafts?select=id,content&id=eq.${workflow.draft_id}&limit=1`, { headers });
+      const drafts = await readResponse<Array<{ id: string; content: string }>>(draftResponse);
+      const draft = drafts[0];
+      if (draft) {
+        const { extractQuotedSpans } = await import('./legalText');
+        const quotes = extractQuotedSpans(draft.content);
+        if (quotes.length) {
+          const { linkDraftToSource } = await import('./knowledgeGraph');
+          const sourceResponse = await fetchImpl(`${baseUrl}/rest/v1/legal_source_sections?select=id&limit=1`, { headers });
+          const sources = await readResponse<Array<{ id: string }>>(sourceResponse).catch(() => []);
+          if (sources[0]) await linkDraftToSource(input.accessToken, profile.office_id, workflow.draft_id, sources[0].id, fetchImpl);
+        }
+      }
+    } catch { /* تغذية الرسم البياني اختيارية — لا تمنع الاعتماد */ }
   }
 
   await recordLegalAudit(input.accessToken, profile.office_id, profile.id, `approval_${input.decision}`, 'legal_drafts', workflow.draft_id, { step: workflow.current_step }, { step: nextStep, note: input.note ?? null }, fetchImpl);

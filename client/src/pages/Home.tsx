@@ -87,6 +87,13 @@ export default function Home() {
           const conflict = await trpcClient.officeFeatures.checkConflict.mutate({ accessToken: session!.access_token, partyName: opponentName, caseId: createdCaseId });
           if (conflict.verdict === 'conflict') toast.warning('تنبيه: الطرف الخصم يطابق طرفاً في قضية أخرى بالمكتب — راجع فحص تعارض المصالح في ملف القضية.');
         } catch { /* الفحص لا يمنع التسجيل — تنبيه فقط */ }
+      }
+      // تغذية الرسم البياني: قضية جديدة → محكمة
+      if (createdCaseId) {
+        const courtName = (data.get('court') as string)?.trim();
+        if (courtName) {
+          trpcClient.completeIntelligence.recordEvent.mutate({ accessToken: session!.access_token, eventType: 'case_created', caseId: createdCaseId, courtName }).catch(() => undefined);
+        }
       } }
     if (kind === 'hearing') { const at = new Date(data.get('at') as string); ({ error } = await supabase.from('hearings').insert({ office_id: profile!.office_id!, case_id: data.get('case') as string, hearing_at: at.toISOString(), court_name: data.get('court') || null, court_room: data.get('room') || null, hearing_type: data.get('type') || null, reminder_at: new Date(at.getTime() - 86400000).toISOString(), notes: data.get('notes') || null, created_by: profile!.id })); }
     if (kind === 'task') ({ error } = await supabase.from('tasks').insert({ office_id: profile!.office_id!, title: data.get('title') as string, description: data.get('description') || null, case_id: data.get('case') || null, assigned_to: data.get('member') || profile!.id, priority: data.get('priority') as string, due_at: data.get('due') ? new Date(data.get('due') as string).toISOString() : null, created_by: profile!.id }));
@@ -94,7 +101,12 @@ export default function Home() {
     if (kind === 'doc') { const file = data.get('file') as File; if (!file?.name) return toast.error('اختر ملفاً أولاً.'); const ext = file.name.includes('.') ? '.' + file.name.split('.').pop() : '';
           const base = file.name.slice(0, file.name.length - ext.length).replace(/[^a-zA-Z0-9\-_]/g, '');
           const safeBase = (base || 'file').slice(0, 60);
-          const path = `${profile!.office_id}/${Date.now()}-${safeBase}${ext}`; const upload = await supabase.storage.from('legal-documents').upload(path, file, { contentType: file.type }); if (upload.error) return toast.error(upload.error.message); ({ error } = await supabase.from('documents').insert({ office_id: profile!.office_id!, file_name: file.name, storage_path: path, mime_type: file.type || null, byte_size: file.size, category: data.get('category') as string, case_id: data.get('case') || null, client_id: data.get('client') || null, uploaded_by: profile!.id })); }
+          const path = `${profile!.office_id}/${Date.now()}-${safeBase}${ext}`; const upload = await supabase.storage.from('legal-documents').upload(path, file, { contentType: file.type }); if (upload.error) return toast.error(upload.error.message); const { data: insertedDoc, error: docError } = await supabase.from('documents').insert({ office_id: profile!.office_id!, file_name: file.name, storage_path: path, mime_type: file.type || null, byte_size: file.size, category: data.get('category') as string, case_id: data.get('case') || null, client_id: data.get('client') || null, uploaded_by: profile!.id }).select('id').single(); error = docError;
+          // تغذية الرسم البياني: مستند → قضية
+          const docCaseId = (data.get('case') as string) || null;
+          if (!error && insertedDoc?.id && docCaseId) {
+            trpcClient.completeIntelligence.recordEvent.mutate({ accessToken: session!.access_token, eventType: 'document_uploaded', caseId: docCaseId, documentId: insertedDoc.id }).catch(() => undefined);
+          } }
     if (error) return toast.error(error.message); setModal(null); await load(); toast.success(kind === 'case' ? (createdFiles > 0 ? `تم تسجيل القضية مع ${createdFiles} ورقة - يبدأ التحليل الذكي.` : 'تم تسجيل القضية.') : kind === 'task' ? 'تم إنشاء المهمة.' : 'تم الحفظ بنجاح.');
     if (kind === 'case' && createdCaseId) { if (autoIntake) setPendingIntake(createdCaseId); navigate(`/cases/${createdCaseId}`); }
   };
@@ -106,7 +118,13 @@ export default function Home() {
   const openHearingFor = (caseId: string) => { setPrefillCaseId(caseId); setModal('hearing'); };
   const openTaskFor = (caseId: string) => { setPrefillCaseId(caseId); setModal('task'); };
   const openDocFor = (caseId: string) => { setPrefillCaseId(caseId); setModal('doc'); };
-  const recordOutcome = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (!practitioner) return toast.error('تسجيل نتيجة الجلسة متاح للمحامي ومدير المكتب فقط.'); if (!selectedHearing) return; const data = new FormData(event.currentTarget); const { error } = await supabase.from('hearings').update({ status: data.get('status') as string, outcome: data.get('outcome') as string }).eq('id', selectedHearing.id); if (error) return toast.error(error.message); setModal(null); setSelectedHearing(null); await load(); toast.success('تم تحديث نتيجة الجلسة.'); };
+  const recordOutcome = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (!practitioner) return toast.error('تسجيل نتيجة الجلسة متاح للمحامي ومدير المكتب فقط.'); if (!selectedHearing) return; const data = new FormData(event.currentTarget); const { error } = await supabase.from('hearings').update({ status: data.get('status') as string, outcome: data.get('outcome') as string }).eq('id', selectedHearing.id); if (error) return toast.error(error.message); setModal(null); setSelectedHearing(null); await load(); toast.success('تم تحديث نتيجة الجلسة.');
+    // تغذية الرسم البياني: نتيجة جلسة → محكمة
+    const hearingCase = cases.find(c => c.id === selectedHearing.case_id);
+    if (hearingCase?.court_name) {
+      trpcClient.completeIntelligence.recordEvent.mutate({ accessToken: session!.access_token, eventType: 'hearing_outcome', caseId: selectedHearing.case_id, courtName: hearingCase.court_name }).catch(() => undefined);
+    }
+  };
   if (!ready) return <main className="min-h-screen grid place-items-center bg-[#f4f7f5]"><Loader2 className="animate-spin text-[#1b6258]" /></main>;
   if (!session) return <Login done={() => load()} />;
   if (isPlatformAdmin) {

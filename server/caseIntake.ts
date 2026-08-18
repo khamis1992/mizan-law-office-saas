@@ -6,7 +6,7 @@ import { aiModelName, aiProviderName, callChatCompletion, callVisionCompletion }
 import { assertAiQuota } from './aiQuota';
 import { verifyCitations, type CitationVerification } from './citationGate';
 import { assertPractitioner, getProfile, getVerifiedUser, readResponse, requiredEnv, supabaseHeaders, type Profile } from './supabaseAccess';
-import { extractSearchTerms, rankSections } from './retrieval';
+import { extractSearchTerms, applyPreferenceBoost, rankSections } from './retrieval';
 
 /**
  * التحليل الافتتاحي الذكي للقضية — قلب «النظام الذكي لا الأرشيفي»:
@@ -259,8 +259,10 @@ export async function runCaseIntake(input: z.infer<typeof caseIntakeInput>, deps
   // المرحلة 2: استرجاع المصادر الموثقة من مستخرجات القراءة
   const retrievalQuery = [reading.claimsSummary, ...reading.legalIssues, ...reading.keyFacts.slice(0, 5)].join(' ');
   const { ranked, precedents } = await retrieveSources(input.accessToken, retrievalQuery, fetchImpl);
+  // محرك التعلّم: إعادة ترتيب المصادر حسب تفضيلات المكتب
+  const boostedRanked = await applyPreferenceBoost(input.accessToken, ranked, fetchImpl, 'citation');
 
-  const sourceBlock = ranked.map(section => [
+  const sourceBlock = boostedRanked.map(section => [
     `المعرّف: ${section.id}`,
     `العنوان: ${section.title}${section.articleNumber ? ` — ${section.articleNumber}` : ''}`,
     `النص: ${section.body}`,
@@ -302,17 +304,17 @@ export async function runCaseIntake(input: z.infer<typeof caseIntakeInput>, deps
   strategy.defenses = strategy.defenses.map(defense => ({ ...defense, argument: normalizeBreaks(defense.argument) }));
 
   // بوابة التحقق على اقتباسات المذكرة
-  const verification = verifyCitations([strategy.memoDraft, ...strategy.defenses.map(defense => defense.argument)], ranked);
+  const verification = verifyCitations([strategy.memoDraft, ...strategy.defenses.map(defense => defense.argument)], boostedRanked);
 
   // تنظيف القوانين والسوابق: الاحتفاظ بما يطابق المصادر المسترجعة فعلاً
   const digitsOf = (value: string | null | undefined) => (value ?? '').replace(/[^0-9]/g, '');
   const relevantLaws: IntakeLaw[] = strategy.relevantLaws
     .map(law => {
-      const match = ranked.find(section => {
+      const match = boostedRanked.find(section => {
         const sameArticle = digitsOf(section.articleNumber) !== '' && digitsOf(section.articleNumber) === digitsOf(law.articleNumber);
         const titleClose = section.title === law.title || law.title.includes(section.title.slice(0, 18)) || section.title.includes(law.title.slice(0, 18));
         return sameArticle && titleClose;
-      }) ?? ranked.find(section => digitsOf(section.articleNumber) !== '' && digitsOf(section.articleNumber) === digitsOf(law.articleNumber));
+      }) ?? boostedRanked.find(section => digitsOf(section.articleNumber) !== '' && digitsOf(section.articleNumber) === digitsOf(law.articleNumber));
       return match ? { title: match.title, articleNumber: match.articleNumber, url: match.url, why: law.why, body: match.body } : null;
     })
     .filter((law): law is IntakeLaw => law !== null)

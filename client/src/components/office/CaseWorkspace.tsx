@@ -16,6 +16,7 @@ import { AdversarialPanel, AutoIndexPanel, CaseAgentPanel, CaseChatPanel, CaseEx
 import { AdaptiveTemplatesPanel, SavedDraftsPanel } from './CollaborativeDraftPanel';
 import { CircuitInsightsPanel, ClientBriefPanel, ConsistencyPanel, DeadlinesPanel, EvidenceMapPanel, ExpertReportPanel, GazetteRadarPanel, HearingPrepPanel, PreferenceInsightsPanel, RedactionPanel, SettlementPanel } from './DeepIntelligencePanel';
 import { CaseTwinPanel, DeliberativeMootPanel, EconomicsPanel, FeeProposalPanel, FinancialPortalPanel, KnowledgeGraphPanel, OfficeDoctrinePanel, PostJudgmentPanel, ProceduralStatePanel, TemporalSourcesPanel } from './CompleteIntelligencePanel';
+import DeepJourneys from './DeepJourneys';
 import { downloadPdf, downloadWord } from '@/lib/document-export';
 
 /**
@@ -504,51 +505,12 @@ export default function CaseWorkspace({ caseItem, clients, team, hearings, tasks
         )}
 
         {tab === 'deep' && (
-          <div className="space-y-5">
-            <div className="grid lg:grid-cols-2 gap-5">
-              <CaseTwinPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
-              <ProceduralStatePanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
-            </div>
-            <div className="grid lg:grid-cols-2 gap-5">
-              <DeliberativeMootPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
-              <div className="space-y-5">
-                <EconomicsPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
-                <FeeProposalPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
-              </div>
-            </div>
-            <div className="grid lg:grid-cols-2 gap-5">
-              <PostJudgmentPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
-              <FinancialPortalPanel accessToken={accessToken} clientId={caseItem.client_id} practitioner={practitioner} />
-            </div>
-            <div className="grid lg:grid-cols-2 gap-5">
-              <KnowledgeGraphPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
-              <TemporalSourcesPanel accessToken={accessToken} practitioner={practitioner} />
-            </div>
-            <div className="grid lg:grid-cols-2 gap-5">
-              <HearingPrepPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
-              <ClientBriefPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
-            </div>
-            <div className="grid lg:grid-cols-2 gap-5">
-              <DeadlinesPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
-              <SettlementPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
-            </div>
-            <div className="grid lg:grid-cols-2 gap-5">
-              <EvidenceMapPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
-              <ExpertReportPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
-            </div>
-            <div className="grid lg:grid-cols-2 gap-5">
-              <ConsistencyPanel accessToken={accessToken} practitioner={practitioner} />
-              <RedactionPanel accessToken={accessToken} practitioner={practitioner} />
-            </div>
-            <div className="grid lg:grid-cols-2 gap-5">
-              <OfficeDoctrinePanel accessToken={accessToken} practitioner={practitioner} />
-              <div className="space-y-5">
-                <PreferenceInsightsPanel accessToken={accessToken} />
-                <GazetteRadarPanel accessToken={accessToken} practitioner={practitioner} />
-              </div>
-            </div>
-            <CircuitInsightsPanel accessToken={accessToken} />
-          </div>
+          <DeepJourneys
+            accessToken={accessToken}
+            caseId={caseItem.id}
+            clientId={caseItem.client_id}
+            practitioner={practitioner}
+          />
         )}
 
         {tab === 'features' && (
