@@ -3,6 +3,7 @@ import { approveAgentInput, runAgentInput, approveAgentRun, runAgent } from "./a
 import { generateContractDraft, generateContractInput, listContractTemplates, listTemplatesInput, saveContractVersion, saveVersionInput, transitionContract, transitionInput } from "./contractStudio";
 import { legalAssistantInput, runLegalAssistant } from "./legalAssistant";
 import { caseIntakeInput, runCaseIntake } from './caseIntake';
+import { addGazetteQuery, addGazetteQueryInput, analyzeExpertReport, analyzeExpertReportInput, buildEvidenceMap, buildEvidenceMapInput, circuitInsights, circuitInsightsInput, clientBrief, clientBriefInput, computeDeadlines, computeDeadlinesInput, consistencyCheck, consistencyCheckInput, documentChain, documentChainInput, gazetteCheck, gazetteCheckInput, hearingPrep, hearingPrepInput, listEvidenceMap, listEvidenceMapInput, preferenceInsights, preferenceInsightsInput, recordPreference, recordPreferenceInput, redactText, redactTextInput, settlementValuation, settlementValuationInput } from './deepIntelligence';
 import { addTimeEntry, addTimeEntryInput, checkConflictInput, checkConflictOfInterest, createCaseInvoice, createCaseInvoiceInput, getNotificationPrefs, getNotificationPrefsInput, listCaseInvoices, listCaseInvoicesInput, listMemoTemplates, listMemoTemplatesInput, listTimeEntries, listTimeEntriesInput, renderMemo, renderMemoInput, sendHearingReminder, sendHearingReminderInput, setLimitationDate, setLimitationDateInput, setNotificationPrefs, setNotificationPrefsInput } from './officeFeatures';
 import { legalResearchInput, runLegalResearch, saveResearchMemo, saveResearchMemoInput } from "./legalResearch";
 import { adaptiveTemplateSuggestions, adaptiveTemplateSuggestionsInput, addDraftComment, addDraftCommentInput, advanceApproval, advanceApprovalInput, listApprovalWorkflows, listApprovalWorkflowsInput, listDraftComments, listDraftCommentsInput, listDraftRevisions, listDraftRevisionsInput, recordTemplateUsage, recordTemplateUsageInput, resolveDraftComment, resolveDraftCommentInput, saveDraftRevision, saveDraftRevisionInput, startApprovalWorkflow, startApprovalWorkflowInput } from "./collaborativeDrafting";
@@ -236,6 +237,61 @@ export const appRouter = router({
         if (!profile.office_id) return { allowed: false, used: 0, cap: null as number | null };
         return checkAiQuota(input.accessToken, profile.office_id);
       }),
+  }),
+
+  // طبقة الذكاء العميق — النظام التشغيلي القانوني
+  deepIntelligence: router({
+    evidence: router({
+      build: publicProcedure
+        .input(buildEvidenceMapInput)
+        .mutation(({ input }) => buildEvidenceMap(input)),
+      list: publicProcedure
+        .input(listEvidenceMapInput)
+        .query(({ input }) => listEvidenceMap(input)),
+    }),
+    deadlines: publicProcedure
+      .input(computeDeadlinesInput)
+      .mutation(({ input }) => computeDeadlines(input)),
+    hearingPrep: publicProcedure
+      .input(hearingPrepInput)
+      .mutation(({ input }) => hearingPrep(input)),
+    clientBrief: publicProcedure
+      .input(clientBriefInput)
+      .mutation(({ input }) => clientBrief(input)),
+    expertReport: publicProcedure
+      .input(analyzeExpertReportInput)
+      .mutation(({ input }) => analyzeExpertReport(input)),
+    settlement: publicProcedure
+      .input(settlementValuationInput)
+      .mutation(({ input }) => settlementValuation(input)),
+    preferences: router({
+      record: publicProcedure
+        .input(recordPreferenceInput)
+        .mutation(({ input }) => recordPreference(input)),
+      insights: publicProcedure
+        .input(preferenceInsightsInput)
+        .query(({ input }) => preferenceInsights(input)),
+    }),
+    consistency: publicProcedure
+      .input(consistencyCheckInput)
+      .mutation(({ input }) => consistencyCheck(input)),
+    redact: publicProcedure
+      .input(redactTextInput)
+      .mutation(({ input }) => redactText(input)),
+    circuits: publicProcedure
+      .input(circuitInsightsInput)
+      .query(({ input }) => circuitInsights(input)),
+    gazette: router({
+      add: publicProcedure
+        .input(addGazetteQueryInput)
+        .mutation(({ input }) => addGazetteQuery(input)),
+      check: publicProcedure
+        .input(gazetteCheckInput)
+        .mutation(({ input }) => gazetteCheck(input)),
+    }),
+    documentChain: publicProcedure
+      .input(documentChainInput)
+      .query(({ input }) => documentChain(input)),
   }),
 });
 

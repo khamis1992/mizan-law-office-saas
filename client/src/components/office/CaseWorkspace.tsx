@@ -14,6 +14,7 @@ import type { Client, Hearing, LegalCase, OfficeDocument, Profile, Task } from '
 import { ConflictCheckPanel, LimitationPanel, MemoTemplatesPanel, TimeTrackingPanel } from './OfficeFeaturesPanel';
 import { AdversarialPanel, AutoIndexPanel, CaseAgentPanel, CaseChatPanel, CaseExportPanel, CourtCalendarPanel, CourtPortalPanel, GraduatedRemindersPanel, JudgmentAnalysisPanel, PredictionPanel } from './LegalIntelligencePanel';
 import { AdaptiveTemplatesPanel, SavedDraftsPanel } from './CollaborativeDraftPanel';
+import { CircuitInsightsPanel, ClientBriefPanel, ConsistencyPanel, DeadlinesPanel, EvidenceMapPanel, ExpertReportPanel, GazetteRadarPanel, HearingPrepPanel, PreferenceInsightsPanel, RedactionPanel, SettlementPanel } from './DeepIntelligencePanel';
 import { downloadPdf, downloadWord } from '@/lib/document-export';
 
 /**
@@ -57,7 +58,7 @@ type ContractDoc = { id: string; title: string; status: string; current_version:
 const CONTRACT_STATUS: Record<string, string> = { draft: 'مسودة', in_review: 'مراجعة', approved: 'معتمد', ready_for_export: 'جاهز للتصدير' };
 
 export default function CaseWorkspace({ caseItem, clients, team, hearings, tasks, documents, accessToken, officeId, autoAnalyze, onAutoAnalyzeDone, practitioner, manager, profileId, onClose, onScheduleHearing, onNewTask, onUploadDoc, onRefresh }: Props) {
-  const [tab, setTab] = useState<'timeline' | 'hearings' | 'tasks' | 'docs' | 'ai' | 'features' | 'intelligence'>('timeline');
+  const [tab, setTab] = useState<'timeline' | 'hearings' | 'tasks' | 'docs' | 'ai' | 'features' | 'intelligence' | 'deep'>('timeline');
   const [status, setStatus] = useState(caseItem.status);
   const [contracts, setContracts] = useState<ContractDoc[]>([]);
   const [intake, setIntake] = useState<IntakeView | null>(null);
@@ -184,6 +185,7 @@ export default function CaseWorkspace({ caseItem, clients, team, hearings, tasks
     { id: 'docs' as const, label: `المستندات (${caseDocs.length})` },
     { id: 'ai' as const, label: `الذكاء (${contracts.length})` },
     { id: 'intelligence' as const, label: 'شريك المرافعة' },
+    { id: 'deep' as const, label: 'الذكاء العميق' },
     { id: 'features' as const, label: 'أدوات المكتب' },
   ];
 
@@ -497,6 +499,34 @@ export default function CaseWorkspace({ caseItem, clients, team, hearings, tasks
               <AutoIndexPanel accessToken={accessToken} practitioner={practitioner} />
             </div>
             <CaseExportPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
+          </div>
+        )}
+
+        {tab === 'deep' && (
+          <div className="space-y-5">
+            <div className="grid lg:grid-cols-2 gap-5">
+              <HearingPrepPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
+              <ClientBriefPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
+            </div>
+            <div className="grid lg:grid-cols-2 gap-5">
+              <DeadlinesPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
+              <SettlementPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
+            </div>
+            <div className="grid lg:grid-cols-2 gap-5">
+              <EvidenceMapPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
+              <ExpertReportPanel accessToken={accessToken} caseId={caseItem.id} practitioner={practitioner} />
+            </div>
+            <div className="grid lg:grid-cols-2 gap-5">
+              <ConsistencyPanel accessToken={accessToken} practitioner={practitioner} />
+              <RedactionPanel accessToken={accessToken} practitioner={practitioner} />
+            </div>
+            <div className="grid lg:grid-cols-2 gap-5">
+              <CircuitInsightsPanel accessToken={accessToken} />
+              <div className="space-y-5">
+                <PreferenceInsightsPanel accessToken={accessToken} />
+                <GazetteRadarPanel accessToken={accessToken} practitioner={practitioner} />
+              </div>
+            </div>
           </div>
         )}
 
