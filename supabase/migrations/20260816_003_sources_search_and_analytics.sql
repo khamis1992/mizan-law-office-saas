@@ -4,11 +4,12 @@
 begin;
 
 create or replace function public.search_legal_sections(p_query text, p_limit integer default 12)
-returns table (id uuid, source_id uuid, article_number text, heading text, snippet text, title text, source_url text, official_number text, rank real)
+returns table (id uuid, source_id uuid, article_number text, heading text, snippet text, body text, title text, source_url text, official_number text, effective_on date, is_current boolean, rank real)
 language sql stable security invoker set search_path = public as $$
   select s.id, s.source_id, s.article_number, s.heading,
          left(s.body, 320) as snippet,
-         ls.title, ls.source_url, ls.official_number,
+         s.body,
+         ls.title, ls.source_url, ls.official_number, ls.effective_on, ls.is_current,
          ts_rank(s.search_vector, q.term_or) as rank
   from public.legal_source_sections s
   join public.legal_sources ls on ls.id = s.source_id
