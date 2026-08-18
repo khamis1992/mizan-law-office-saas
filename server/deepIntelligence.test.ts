@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeQatarAppealDeadlines } from './deepIntelligence';
+import { ALLOWED_STATE_TRANSITIONS, STATE_TASKS } from './completeIntelligence';
 
 describe('computeQatarAppealDeadlines', () => {
   const holidays = [
@@ -40,5 +41,27 @@ describe('computeQatarAppealDeadlines', () => {
     const deadlines = computeQatarAppealDeadlines(new Date('2026-01-01'), 'urgent', holidays);
     const cassation = deadlines.find(d => d.type === 'cassation');
     expect(cassation?.days).toBe(60);
+  });
+});
+
+describe('ALLOWED_STATE_TRANSITIONS', () => {
+  it('يسمح بالانتقال الطبيعي من جديدة إلى جلسات', () => {
+    expect(ALLOWED_STATE_TRANSITIONS.new_filing).toContain('hearings');
+    expect(ALLOWED_STATE_TRANSITIONS.new_filing).toContain('closed');
+  });
+  it('لا يسمح بالقفز من جديدة إلى تنفيذ', () => {
+    expect(ALLOWED_STATE_TRANSITIONS.new_filing).not.toContain('execution');
+    expect(ALLOWED_STATE_TRANSITIONS.new_filing).not.toContain('judgment_issued');
+  });
+  it('يسمح بالطعن بعد صدور الحكم', () => {
+    expect(ALLOWED_STATE_TRANSITIONS.judgment_issued).toContain('appeal');
+    expect(ALLOWED_STATE_TRANSITIONS.judgment_issued).toContain('execution');
+  });
+  it('الحالة المغلقة لا تسمح بأي انتقال', () => {
+    expect(ALLOWED_STATE_TRANSITIONS.closed).toHaveLength(0);
+  });
+  it('ينشئ مهام تلقائية في كل حالة فعلية', () => {
+    expect(STATE_TASKS.judgment_issued.length).toBeGreaterThan(0);
+    expect(STATE_TASKS.appeal.length).toBeGreaterThan(0);
   });
 });

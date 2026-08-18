@@ -8,6 +8,7 @@ import { addTimeEntry, addTimeEntryInput, checkConflictInput, checkConflictOfInt
 import { legalResearchInput, runLegalResearch, saveResearchMemo, saveResearchMemoInput } from "./legalResearch";
 import { adaptiveTemplateSuggestions, adaptiveTemplateSuggestionsInput, addDraftComment, addDraftCommentInput, advanceApproval, advanceApprovalInput, listApprovalWorkflows, listApprovalWorkflowsInput, listDraftComments, listDraftCommentsInput, listDraftRevisions, listDraftRevisionsInput, recordTemplateUsage, recordTemplateUsageInput, resolveDraftComment, resolveDraftCommentInput, saveDraftRevision, saveDraftRevisionInput, startApprovalWorkflow, startApprovalWorkflowInput } from "./collaborativeDrafting";
 import { acceptJudgmentPrecedent, acceptJudgmentPrecedentInput, analyzeJudgment, analyzeJudgmentInput, autoIndexEmbeddings, autoIndexEmbeddingsInput, caseChat, caseChatInput, dispatchGraduatedReminders, dispatchGraduatedRemindersInput, exportCaseFile, exportCaseFileInput, generateAdversarialMemo, generateAdversarialMemoInput, lawyerDayBoard, lawyerDayBoardInput, listAdversarialMemos, listAdversarialMemosInput, listAgentSuggestions, listAgentSuggestionsInput, listCaseChat, listCaseChatInput, listCourtHolidays, listCourtHolidaysInput, listLegalAudit, listLegalAuditInput, predictCaseOutcome, predictCaseOutcomeInput, runCaseAgent, runCaseAgentInput, syncCourtCase, syncCourtCaseInput, updateSuggestion, updateSuggestionInput } from "./legalIntelligence";
+import { caseTwin, caseTwinInput, contractOpportunityRadar, contractOpportunityRadarInput, deliberativeMoot, deliberativeMootInput, distillDoctrine, distillDoctrineInput, feeProposal, feeProposalInput, generateFinancialPortal, generateFinancialPortalInput, getProceduralState, getProceduralStateInput, graphConflictCheck, graphConflictCheckInput, listDoctrines, listDoctrinesInput, listPostJudgment, listPostJudgmentInput, matterEconomics, matterEconomicsInput, postJudgment, postJudgmentInput, queryKnowledgeGraph, queryKnowledgeGraphInput, runEvaluation, runEvaluationInput, temporalSources, temporalSourcesInput, transitionProceduralState, transitionProceduralStateInput, writeKnowledgeEdge, writeKnowledgeEdgeInput } from "./completeIntelligence";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
@@ -292,6 +293,69 @@ export const appRouter = router({
     documentChain: publicProcedure
       .input(documentChainInput)
       .query(({ input }) => documentChain(input)),
+  }),
+
+  // استكمال الذكاء العميق — نظام تشغيل قانوني كامل
+  completeIntelligence: router({
+    knowledgeGraph: router({
+      writeEdge: publicProcedure
+        .input(writeKnowledgeEdgeInput)
+        .mutation(({ input }) => writeKnowledgeEdge(input)),
+      query: publicProcedure
+        .input(queryKnowledgeGraphInput)
+        .query(({ input }) => queryKnowledgeGraph(input)),
+      conflictCheck: publicProcedure
+        .input(graphConflictCheckInput)
+        .mutation(({ input }) => graphConflictCheck(input)),
+    }),
+    procedural: router({
+      get: publicProcedure
+        .input(getProceduralStateInput)
+        .query(({ input }) => getProceduralState(input)),
+      transition: publicProcedure
+        .input(transitionProceduralStateInput)
+        .mutation(({ input }) => transitionProceduralState(input)),
+    }),
+    twin: publicProcedure
+      .input(caseTwinInput)
+      .mutation(({ input }) => caseTwin(input)),
+    moot: publicProcedure
+      .input(deliberativeMootInput)
+      .mutation(({ input }) => deliberativeMoot(input)),
+    temporal: publicProcedure
+      .input(temporalSourcesInput)
+      .query(({ input }) => temporalSources(input)),
+    opportunities: publicProcedure
+      .input(contractOpportunityRadarInput)
+      .query(({ input }) => contractOpportunityRadar(input)),
+    postJudgment: router({
+      analyze: publicProcedure
+        .input(postJudgmentInput)
+        .mutation(({ input }) => postJudgment(input)),
+      list: publicProcedure
+        .input(listPostJudgmentInput)
+        .query(({ input }) => listPostJudgment(input)),
+    }),
+    economics: publicProcedure
+      .input(matterEconomicsInput)
+      .mutation(({ input }) => matterEconomics(input)),
+    eval: publicProcedure
+      .input(runEvaluationInput)
+      .mutation(({ input }) => runEvaluation(input)),
+    doctrines: router({
+      distill: publicProcedure
+        .input(distillDoctrineInput)
+        .mutation(({ input }) => distillDoctrine(input)),
+      list: publicProcedure
+        .input(listDoctrinesInput)
+        .query(({ input }) => listDoctrines(input)),
+    }),
+    fees: publicProcedure
+      .input(feeProposalInput)
+      .mutation(({ input }) => feeProposal(input)),
+    financialPortal: publicProcedure
+      .input(generateFinancialPortalInput)
+      .mutation(({ input }) => generateFinancialPortal(input)),
   }),
 });
 
