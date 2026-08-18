@@ -22,9 +22,104 @@ export type MemoTemplate = { id: string; code: string; titleAr: string; descript
 
 export const listMemoTemplatesInput = z.object({ accessToken: z.string().min(20) });
 
+/** القوالب الأساسية الثلاثة — تُدرج تلقائياً إن كان الجدول فارغاً. */
+const SEED_MEMO_TEMPLATES = [
+  {
+    code: 'defense_memo_qa', title: 'مذكرة دفاع', description: 'مذكرة دفاع أمام المحاكم القطرية: ترويسة، تمهيد، وقائع، دفوع شكلية وموضوعية، طلبات ختامية.', memoType: 'defense',
+    variables: [
+      { key: 'court_name', label_ar: 'المحكمة', type: 'text', required: true },
+      { key: 'case_number', label_ar: 'رقم الدعوى', type: 'text', required: true },
+      { key: 'claimant', label_ar: 'المدعي', type: 'text', required: true },
+      { key: 'defendant', label_ar: 'المدعى عليه', type: 'text', required: true },
+      { key: 'facts', label_ar: 'الوقائع', type: 'textarea', required: true },
+      { key: 'defenses', label_ar: 'الدفوع', type: 'textarea', required: true },
+      { key: 'requests', label_ar: 'الطلبات الختامية', type: 'textarea', required: true },
+    ],
+    sections: [
+      { code: 'header', titleAr: 'الترويسة', body: 'محكمة {{court_name}}\nالدعوى رقم: {{case_number}}\n\nالمدعي: {{claimant}}\nالمدعى عليه: {{defendant}}', order: 10 },
+      { code: 'prelude', titleAr: 'التمهيد', body: 'السيد رئيس المحكمة الموقر / السادة أعضاء المحكمة الموقرون\n\nتحية طيبة وبعد،\n\nمقدمة من المدعى عليه {{defendant}} بصفته في الدعوى رقم {{case_number}}.', order: 20 },
+      { code: 'facts', titleAr: 'الوقائع', body: 'الوقائع:\n{{facts}}', order: 30 },
+      { code: 'defenses', titleAr: 'الدفوع', body: 'الدفوع:\n{{defenses}}', order: 40 },
+      { code: 'requests', titleAr: 'الطلبات الختامية', body: 'بناءً عليه، يلتمس المدعى عليه من عدالتكم:\n{{requests}}\n\nوتفضّلوا بقبول فائق الاحترام والتقدير.\n\nوكيل المدعى عليه\n______', order: 50 },
+    ],
+  },
+  {
+    code: 'reply_memo_qa', title: 'مذكرة رد', description: 'مذكرة رد على مذكرة الخصم: الرد على الدفوع والطلبات ببيان سندها القانوني.', memoType: 'reply',
+    variables: [
+      { key: 'court_name', label_ar: 'المحكمة', type: 'text', required: true },
+      { key: 'case_number', label_ar: 'رقم الدعوى', type: 'text', required: true },
+      { key: 'claimant', label_ar: 'المدعي', type: 'text', required: true },
+      { key: 'defendant', label_ar: 'المدعى عليه', type: 'text', required: true },
+      { key: 'opponent_memo', label_ar: 'خلاصة مذكرة الخصم', type: 'textarea', required: true },
+      { key: 'rebuttals', label_ar: 'الردود', type: 'textarea', required: true },
+      { key: 'requests', label_ar: 'الطلبات الختامية', type: 'textarea', required: true },
+    ],
+    sections: [
+      { code: 'header', titleAr: 'الترويسة', body: 'محكمة {{court_name}}\nالدعوى رقم: {{case_number}}\n\nالمدعي: {{claimant}}\nالمدعى عليه: {{defendant}}', order: 10 },
+      { code: 'prelude', titleAr: 'التمهيد', body: 'السيد رئيس المحكمة الموقر / السادة أعضاء المحكمة الموقرون\n\nتحية طيبة وبعد،\n\nمقدمة من {{defendant}} رداً على مذكرة {{claimant}} في الدعوى رقم {{case_number}}.', order: 20 },
+      { code: 'opponent', titleAr: 'خلاصة مذكرة الخصم', body: 'أودع الخصم مذكرة خلاصتها:\n{{opponent_memo}}', order: 30 },
+      { code: 'rebuttals', titleAr: 'الردود', body: 'الرد على ما ورد فيها:\n{{rebuttals}}', order: 40 },
+      { code: 'requests', titleAr: 'الطلبات الختامية', body: 'بناءً عليه، يلتمس {{defendant}} من عدالتكم:\n{{requests}}\n\nوتفضّلوا بقبول فائق الاحترام والتقدير.\n\nوكيل {{defendant}}\n______', order: 50 },
+    ],
+  },
+  {
+    code: 'appeal_memo_qa', title: 'مذكرة استئناف', description: 'مذكرة استئناف حكم: أسباب الاستئناف وسنده القانوني والطلبات.', memoType: 'appeal',
+    variables: [
+      { key: 'court_name', label_ar: 'محكمة الاستئناف', type: 'text', required: true },
+      { key: 'case_number', label_ar: 'رقم الدعوى', type: 'text', required: true },
+      { key: 'appellant', label_ar: 'المستأنف', type: 'text', required: true },
+      { key: 'respondent', label_ar: 'المستأنف ضده', type: 'text', required: true },
+      { key: 'judgment_summary', label_ar: 'خلاصة الحكم المستأنف', type: 'textarea', required: true },
+      { key: 'grounds', label_ar: 'أسباب الاستئناف', type: 'textarea', required: true },
+      { key: 'requests', label_ar: 'الطلبات', type: 'textarea', required: true },
+    ],
+    sections: [
+      { code: 'header', titleAr: 'الترويسة', body: 'محكمة {{court_name}}\nالدعوى رقم: {{case_number}}\n\nالمستأنف: {{appellant}}\nالمستأنف ضده: {{respondent}}', order: 10 },
+      { code: 'prelude', titleAr: 'التمهيد', body: 'السيد رئيس المحكمة الموقر / السادة أعضاء المحكمة الموقرون\n\nتحية طيبة وبعد،\n\nمقدمة من المستأنف {{appellant}} بصفته في الدعوى رقم {{case_number}} استئنافاً للحكم الصادر فيها.', order: 20 },
+      { code: 'judgment', titleAr: 'الحكم المستأنف', body: 'صدر الحكم المستأنف بخلاصة:\n{{judgment_summary}}', order: 30 },
+      { code: 'grounds', titleAr: 'أسباب الاستئناف', body: 'أسباب الاستئناف:\n{{grounds}}', order: 40 },
+      { code: 'requests', titleAr: 'الطلبات', body: 'بناءً عليه، يلتمس المستأنف من عدالتكم:\n{{requests}}\n\nوتفضّلوا بقبول فائق الاحترام والتقدير.\n\nوكيل المستأنف\n______', order: 50 },
+    ],
+  },
+];
+
+/** بذر القوالب تلقائياً إن كان الجدول فارغاً — يعمل فوراً بلا خطوة ترحيل يدوية. */
+export async function seedMemoTemplatesIfEmpty(accessToken: string, fetchImpl: typeof fetch): Promise<void> {
+  const baseUrl = requiredEnv('VITE_SUPABASE_URL');
+  const headers = supabaseHeaders(accessToken);
+  const check = await fetchImpl(`${baseUrl}/rest/v1/memo_templates?select=code&limit=1`, { headers });
+  if (!check.ok) return; // الجدول غير موجود بعد — يتجاهل بهدوء
+  const rows = await check.json() as Array<{ code: string }>;
+  if (rows.length > 0) return;
+
+  for (const template of SEED_MEMO_TEMPLATES) {
+    const insertResponse = await fetchImpl(`${baseUrl}/rest/v1/memo_templates`, {
+      method: 'POST',
+      headers: { ...headers, Prefer: 'return=representation' },
+      body: JSON.stringify({
+        code: template.code, title_ar: template.title, description_ar: template.description,
+        memo_type: template.memoType, jurisdiction: 'QA', variables: template.variables, is_active: true,
+      }),
+    });
+    if (!insertResponse.ok) continue;
+    const inserted = await insertResponse.json() as Array<{ id: string }>;
+    const templateId = inserted[0]?.id;
+    if (!templateId) continue;
+    await fetchImpl(`${baseUrl}/rest/v1/memo_template_sections`, {
+      method: 'POST',
+      headers: { ...headers, Prefer: 'return=minimal' },
+      body: JSON.stringify(template.sections.map(section => ({
+        template_id: templateId, code: section.code, title_ar: section.titleAr,
+        body_template: section.body, section_order: section.order, is_optional: false,
+      }))),
+    });
+  }
+}
+
 export async function listMemoTemplates(input: z.infer<typeof listMemoTemplatesInput>, deps: OfficeDeps = {}): Promise<MemoTemplate[]> {
   const fetchImpl = deps.fetchImpl ?? fetch;
   await getVerifiedUser(input.accessToken, fetchImpl);
+  await seedMemoTemplatesIfEmpty(input.accessToken, fetchImpl);
   const baseUrl = requiredEnv('VITE_SUPABASE_URL');
   const headers = supabaseHeaders(input.accessToken);
 
